@@ -23,6 +23,23 @@ class Navigable;
 
 namespace Web::SVG {
 
+HTMLHyperlinkElementUtilsHack::~HTMLHyperlinkElementUtilsHack() = default;
+
+Optional<String> HTMLHyperlinkElementUtilsHack::hyperlink_element_utils_href() const
+{
+    return m_element.attribute(HTML::AttributeNames::href);
+}
+
+void HTMLHyperlinkElementUtilsHack::set_hyperlink_element_utils_href(String href)
+{
+    m_element.set_attribute_value(HTML::AttributeNames::href, move(href));
+}
+
+Optional<String> HTMLHyperlinkElementUtilsHack::hyperlink_element_utils_referrerpolicy() const
+{
+    return m_element.attribute(HTML::AttributeNames::referrerpolicy);
+}
+
 GC_DEFINE_ALLOCATOR(SVGAElement);
 
 SVGAElement::SVGAElement(DOM::Document& document, DOM::QualifiedName qualified_name)
@@ -112,35 +129,10 @@ void SVGAElement::activation_behavior(Web::DOM::Event const& event)
 
     // 7. Otherwise, follow the hyperlink created by element with hyperlinkSuffix set to hyperlinkSuffix and userInvolvement set to userInvolvement.
 
-    dbgln("Clicked SVG <a> tag");
+    if (m_hyperlink_utils == nullptr)
+        m_hyperlink_utils = new HTMLHyperlinkElementUtilsHack(document(), *this);
 
-    // TODO: grap proper value
-    auto noopener = Web::HTML::TokenizedFeature::NoOpener::No;
-    auto target_attribute_value = "_self"_string;
-
-    auto target_navigable = document().navigable()->choose_a_navigable(target_attribute_value, noopener).navigable;
-
-    // 8. If targetNavigable is null, then return.
-    if (!target_navigable)
-        return;
-
-    auto url_record = document().encoding_parse_url(href()->base_val());
-
-    // 5. If urlRecord is failure, then return.
-    if (!url_record.has_value())
-        return;
-
-    auto url_string = url_record->serialize();
-
-    auto url = URL::Parser::basic_parse(url_string);
-    VERIFY(url.has_value());
-
-    // auto referrer_policy = ReferrerPolicy::from_string(hyperlink_element_utils_referrerpolicy().value_or({})).value_or(ReferrerPolicy::ReferrerPolicy::EmptyString);
-    auto referrer_policy = ReferrerPolicy::ReferrerPolicy::EmptyString;
-
-    MUST(target_navigable->navigate({ .url = url.release_value(), .source_document = document(), .referrer_policy = referrer_policy, .user_involvement = user_involvement }));
-
-    dbgln("Navigated!");
+    m_hyperlink_utils->follow_the_hyperlink(hyperlink_suffix, user_involvement);
 }
 
 bool SVGAElement::has_download_preference() const

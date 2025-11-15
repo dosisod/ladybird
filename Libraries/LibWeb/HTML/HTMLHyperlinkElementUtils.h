@@ -50,6 +50,8 @@ public:
     String hash() const;
     void set_hash(StringView);
 
+    void follow_the_hyperlink(Optional<String> hyperlink_suffix, UserNavigationInvolvement = UserNavigationInvolvement::None);
+
 protected:
     virtual DOM::Document& hyperlink_element_utils_document() = 0;
     virtual DOM::Element& hyperlink_element_utils_element() = 0;
@@ -64,7 +66,6 @@ protected:
     virtual void hyperlink_element_utils_queue_an_element_task(HTML::Task::Source source, Function<void()> steps) = 0;
 
     void set_the_url();
-    void follow_the_hyperlink(Optional<String> hyperlink_suffix, UserNavigationInvolvement = UserNavigationInvolvement::None);
 
 private:
     void reinitialize_url() const;
