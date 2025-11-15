@@ -23,6 +23,12 @@
 #include <LibWeb/TreeNode.h>
 #include <LibWeb/WebIDL/ExceptionOr.h>
 
+namespace Web::SVG {
+
+class SVGAElement;
+
+}
+
 namespace Web::DOM {
 
 enum class NameOrDescription {
@@ -298,6 +304,7 @@ public:
     HTML::HTMLAnchorElement const* enclosing_link_element() const;
     HTML::HTMLElement const* enclosing_html_element() const;
     HTML::HTMLElement const* enclosing_html_element_with_attribute(FlyString const&) const;
+    SVG::SVGAElement* enclosing_svg_link_element();
 
     Utf16String child_text_content() const;
 

@@ -65,6 +65,7 @@
 #include <LibWeb/Page/Page.h>
 #include <LibWeb/Painting/Paintable.h>
 #include <LibWeb/Painting/PaintableBox.h>
+#include <LibWeb/SVG/SVGAElement.h>
 #include <LibWeb/SVG/SVGElement.h>
 #include <LibWeb/SVG/SVGTitleElement.h>
 #include <LibWeb/XLink/AttributeNames.h>
@@ -140,6 +141,18 @@ HTML::HTMLAnchorElement const* Node::enclosing_link_element() const
 {
     for (auto* node = this; node; node = node->parent()) {
         auto const* anchor_element = as_if<HTML::HTMLAnchorElement>(*node);
+        if (!anchor_element)
+            continue;
+        if (anchor_element->has_attribute(HTML::AttributeNames::href))
+            return anchor_element;
+    }
+    return nullptr;
+}
+
+SVG::SVGAElement* Node::enclosing_svg_link_element()
+{
+    for (auto* node = this; node; node = node->parent()) {
+        auto* anchor_element = as_if<SVG::SVGAElement>(*node);
         if (!anchor_element)
             continue;
         if (anchor_element->has_attribute(HTML::AttributeNames::href))
