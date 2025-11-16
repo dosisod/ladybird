@@ -55,7 +55,7 @@ private:
 
     GC::Ptr<SVGAnimatedString> m_target;
 
-    SVGHyperlinkElementUtils* m_hyperlink_utils;
+    OwnPtr<SVGHyperlinkElementUtils> m_hyperlink_utils;
 };
 
 }

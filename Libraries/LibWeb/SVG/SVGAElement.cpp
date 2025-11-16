@@ -107,12 +107,10 @@ void SVGAElement::activation_behavior(Web::DOM::Event const& event)
     //     hyperlink, then download the hyperlink created by element with hyperlinkSuffix set to hyperlinkSuffix and
     //     userInvolvement set to userInvolvement.
 
-    // DONE TO HERE
-
     // 7. Otherwise, follow the hyperlink created by element with hyperlinkSuffix set to hyperlinkSuffix and userInvolvement set to userInvolvement.
 
     if (m_hyperlink_utils == nullptr)
-        m_hyperlink_utils = new SVGHyperlinkElementUtils(*this, document());
+        m_hyperlink_utils = adopt_own(*new SVGHyperlinkElementUtils(*this, document()));
 
     m_hyperlink_utils->follow_the_hyperlink(hyperlink_suffix, user_involvement);
 }
