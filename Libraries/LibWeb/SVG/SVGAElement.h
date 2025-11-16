@@ -62,17 +62,11 @@ private:
 class HTMLHyperlinkElementUtilsHack : public Web::HTML::HTMLHyperlinkElementUtils {
 public:
     virtual ~HTMLHyperlinkElementUtilsHack();
-    HTMLHyperlinkElementUtilsHack(SVGAElement& svg_element, DOM::Document& document, DOM::Element& element)
-        : m_svg_element(svg_element)
-        , m_document(document)
-        , m_element(element)
-    {
-    }
+    HTMLHyperlinkElementUtilsHack(SVGElement& element, DOM::Document& document);
 
 private:
-    SVGAElement& m_svg_element;
+    SVGElement& m_element;
     DOM::Document& m_document;
-    DOM::Element& m_element;
 
     // ^HTML::HTMLHyperlinkElementUtils
     virtual DOM::Document& hyperlink_element_utils_document() override { return m_document; }
@@ -88,11 +82,11 @@ private:
     }
     virtual String hyperlink_element_utils_get_an_elements_target(Optional<String> target) const override
     {
-        return m_svg_element.get_an_elements_target(target);
+        return m_element.get_an_elements_target(target);
     }
     virtual Web::HTML::TokenizedFeature::NoOpener hyperlink_element_utils_get_an_elements_noopener(URL::URL const& url, StringView target) const override
     {
-        return m_svg_element.get_an_elements_noopener(url, target);
+        return m_element.get_an_elements_noopener(url, target);
     }
 };
 

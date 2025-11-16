@@ -6,10 +6,12 @@
 
 #pragma once
 
+#include <AK/Optional.h>
 #include <LibWeb/DOM/Document.h>
 #include <LibWeb/DOM/Element.h>
 #include <LibWeb/Export.h>
 #include <LibWeb/HTML/HTMLOrSVGElement.h>
+#include <LibWeb/HTML/TokenizedFeatures.h>
 #include <LibWeb/SVG/SVGAnimatedString.h>
 
 namespace Web::SVG {
@@ -35,6 +37,9 @@ public:
 
     virtual bool is_presentational_hint(FlyString const&) const override;
     virtual void apply_presentational_hints(GC::Ref<CSS::CascadedProperties>) const override;
+
+    String get_an_elements_target(Optional<String> target = {}) const;
+    Web::HTML::TokenizedFeature::NoOpener get_an_elements_noopener(URL::URL const& url, StringView target) const;
 
 protected:
     SVGElement(DOM::Document&, DOM::QualifiedName);
