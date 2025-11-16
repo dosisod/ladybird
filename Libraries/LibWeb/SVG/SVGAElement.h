@@ -29,10 +29,6 @@ public:
 
     virtual GC::Ptr<Layout::Node> create_layout_node(GC::Ref<CSS::ComputedProperties>) override;
 
-    // TODO: move to SVGElement
-    String get_an_elements_target(Optional<String> target = {}) const;
-    Web::HTML::TokenizedFeature::NoOpener get_an_elements_noopener(URL::URL const& url, StringView target) const;
-
 private:
     SVGAElement(DOM::Document&, DOM::QualifiedName);
 

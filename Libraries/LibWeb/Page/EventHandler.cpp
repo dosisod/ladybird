@@ -560,24 +560,16 @@ EventResult EventHandler::handle_mouseup(CSSPixelPoint visual_viewport_position,
                         }
                     }
                 } else if (GC::Ptr<SVG::SVGAElement> link = node->enclosing_svg_link_element()) {
-                    dbgln("Clicking SVG <a> tag inside page handler");
                     GC::Ref<DOM::Document> document = *m_navigable->active_document();
                     auto href = link->href()->base_val();
                     auto url = document->encoding_parse_url(href);
                     if (url.has_value()) {
                         if (button == UIEvents::MouseButton::Primary && (modifiers & UIEvents::Mod_PlatformCtrl) != 0) {
-                            dbgln("Primary");
                             m_navigable->page().client().page_did_click_link(*url, link->target()->base_val().to_byte_string(), modifiers);
                         } else if (button == UIEvents::MouseButton::Middle) {
-                            dbgln("Middle");
                             m_navigable->page().client().page_did_middle_click_link(*url, link->target()->base_val().to_byte_string(), modifiers);
                         } else if (button == UIEvents::MouseButton::Secondary) {
-                            dbgln("Secondary");
                             m_navigable->page().client().page_did_request_link_context_menu(top_level_viewport_position, *url, link->target()->base_val().to_byte_string(), modifiers);
-                        } else if (button == UIEvents::MouseButton::Primary) {
-                            dbgln("Yes?");
-                        } else {
-                            dbgln("Other");
                         }
                     }
                 } else if (button == UIEvents::MouseButton::Secondary) {

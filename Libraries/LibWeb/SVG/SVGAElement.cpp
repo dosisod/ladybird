@@ -5,20 +5,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <LibURL/Parser.h>
 #include <LibWeb/Bindings/SVGAElementPrototype.h>
 #include <LibWeb/DOM/DOMTokenList.h>
-#include <LibWeb/HTML/Navigable.h>
-#include <LibWeb/HTML/UserNavigationInvolvement.h>
+#include <LibWeb/Forward.h>
 #include <LibWeb/Layout/SVGGraphicsBox.h>
 #include <LibWeb/SVG/SVGAElement.h>
 #include <LibWeb/UIEvents/MouseEvent.h>
-
-namespace Web::HTML {
-
-class Navigable;
-
-}
 
 namespace Web::SVG {
 
