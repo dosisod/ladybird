@@ -8,9 +8,11 @@
 #include <LibURL/Parser.h>
 #include <LibWeb/Bindings/SVGAElementPrototype.h>
 #include <LibWeb/DOM/DOMTokenList.h>
+#include <LibWeb/HTML/HTMLBaseElement.h>
 #include <LibWeb/HTML/Navigable.h>
 #include <LibWeb/HTML/TokenizedFeatures.h>
 #include <LibWeb/HTML/UserNavigationInvolvement.h>
+#include <LibWeb/Infra/CharacterTypes.h>
 #include <LibWeb/Layout/SVGGraphicsBox.h>
 #include <LibWeb/SVG/SVGAElement.h>
 #include <LibWeb/UIEvents/MouseEvent.h>
@@ -130,7 +132,7 @@ void SVGAElement::activation_behavior(Web::DOM::Event const& event)
     // 7. Otherwise, follow the hyperlink created by element with hyperlinkSuffix set to hyperlinkSuffix and userInvolvement set to userInvolvement.
 
     if (m_hyperlink_utils == nullptr)
-        m_hyperlink_utils = new HTMLHyperlinkElementUtilsHack(document(), *this);
+        m_hyperlink_utils = new HTMLHyperlinkElementUtilsHack(*this, document(), *this);
 
     m_hyperlink_utils->follow_the_hyperlink(hyperlink_suffix, user_involvement);
 }
@@ -187,6 +189,66 @@ GC::Ref<DOM::DOMTokenList> SVGAElement::rel_list()
 GC::Ptr<Layout::Node> SVGAElement::create_layout_node(GC::Ref<CSS::ComputedProperties> style)
 {
     return heap().allocate<Layout::SVGGraphicsBox>(document(), *this, move(style));
+}
+
+// TODO: move to SVGElement
+// https://html.spec.whatwg.org/multipage/semantics.html#get-an-element's-target
+String SVGAElement::get_an_elements_target(Optional<String> target) const
+{
+    // To get an element's target, given an a, area, or form element element, and an optional string-or-null target (default null), run these steps:
+
+    // 1. If target is null, then:
+    if (!target.has_value()) {
+        // 1. If element has a target attribute, then set target to that attribute's value.
+        if (auto maybe_target = attribute(AttributeNames::target); maybe_target.has_value()) {
+            target = maybe_target.release_value();
+        }
+        // 2. Otherwise, if element's node document contains a base element with a target attribute,
+        //    set target to the value of the target attribute of the first such base element.
+        if (auto base_element = document().first_base_element_with_target_in_tree_order())
+            target = base_element->attribute(AttributeNames::target);
+    }
+
+    // 2. If target is not null, and contains an ASCII tab or newline and a U+003C (<), then set target to "_blank".
+    if (target.has_value() && target->bytes_as_string_view().contains("\t\n\r"sv) && target->contains('<'))
+        target = "_blank"_string;
+
+    // 3. Return target.
+    return target.value_or({});
+}
+
+// https://html.spec.whatwg.org/multipage/links.html#get-an-element's-noopener
+Web::HTML::TokenizedFeature::NoOpener SVGAElement::get_an_elements_noopener(URL::URL const& url, StringView target) const
+{
+    // To get an element's noopener, given an a, area, or form element element, a URL record url, and a string target,
+    // perform the following steps. They return a boolean.
+    auto rel = MUST(get_attribute_value(HTML::AttributeNames::rel).to_lowercase());
+    auto link_types = rel.bytes_as_string_view().split_view_if(Web::Infra::is_ascii_whitespace);
+
+    // 1. If element's link types include the noopener or noreferrer keyword, then return true.
+    if (link_types.contains_slow("noopener"sv) || link_types.contains_slow("noreferrer"sv))
+        return Web::HTML::TokenizedFeature::NoOpener::Yes;
+
+    // 2. If element's link types do not include the opener keyword and
+    //    target is an ASCII case-insensitive match for "_blank", then return true.
+    if (!link_types.contains_slow("opener"sv) && target.equals_ignoring_ascii_case("_blank"sv))
+        return Web::HTML::TokenizedFeature::NoOpener::Yes;
+
+    // 3. If url's blob URL entry is not null:
+    if (url.blob_url_entry().has_value()) {
+        // 1. Let blobOrigin be url's blob URL entry's environment's origin.
+        auto const& blob_origin = url.blob_url_entry()->environment.origin;
+
+        // 2. Let topLevelOrigin be element's relevant settings object's top-level origin.
+        auto const& top_level_origin = relevant_settings_object(*this).top_level_origin;
+
+        // 3. If blobOrigin is not same site with topLevelOrigin, then return true.
+        if (!blob_origin.is_same_site(top_level_origin.value()))
+            return Web::HTML::TokenizedFeature::NoOpener::Yes;
+    }
+
+    // 4. Return false.
+    return Web::HTML::TokenizedFeature::NoOpener::No;
 }
 
 }

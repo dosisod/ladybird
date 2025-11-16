@@ -13,45 +13,7 @@
 
 namespace Web::SVG {
 
-class HTMLHyperlinkElementUtilsHack : public Web::HTML::HTMLHyperlinkElementUtils {
-public:
-    virtual ~HTMLHyperlinkElementUtilsHack();
-    HTMLHyperlinkElementUtilsHack(DOM::Document& document, DOM::Element& element)
-        : m_document(document)
-        , m_element(element)
-    {
-    }
-
-private:
-    DOM::Document& m_document;
-    DOM::Element& m_element;
-
-    // ^HTML::HTMLHyperlinkElementUtils
-    virtual DOM::Document& hyperlink_element_utils_document() override { return m_document; }
-    virtual DOM::Element& hyperlink_element_utils_element() override { return m_element; }
-    virtual Optional<String> hyperlink_element_utils_href() const override;
-    virtual void set_hyperlink_element_utils_href(String) override;
-    virtual Optional<String> hyperlink_element_utils_referrerpolicy() const override;
-    virtual bool hyperlink_element_utils_is_html_anchor_element() const final { return true; }
-    virtual bool hyperlink_element_utils_is_connected() const final { return m_element.is_connected(); }
-    virtual void hyperlink_element_utils_queue_an_element_task(HTML::Task::Source source, Function<void()> steps) override
-    {
-        m_element.queue_an_element_task(source, move(steps));
-    }
-    virtual String hyperlink_element_utils_get_an_elements_target(Optional<String> target) const override
-    {
-        (void)target;
-        // return m_html_element.get_an_elements_target(target);
-        return "_self"_string;
-    }
-    virtual Web::HTML::TokenizedFeature::NoOpener hyperlink_element_utils_get_an_elements_noopener(URL::URL const& url, StringView target) const override
-    {
-        (void)url;
-        (void)target;
-        // return m_html_element.get_an_elements_noopener(url, target);
-        return Web::HTML::TokenizedFeature::NoOpener::Yes;
-    }
-};
+class HTMLHyperlinkElementUtilsHack;
 
 class SVGAElement final
     : public SVGGraphicsElement
@@ -67,6 +29,10 @@ public:
     GC::Ref<DOM::DOMTokenList> rel_list();
 
     virtual GC::Ptr<Layout::Node> create_layout_node(GC::Ref<CSS::ComputedProperties>) override;
+
+    // TODO: move to SVGElement
+    String get_an_elements_target(Optional<String> target = {}) const;
+    Web::HTML::TokenizedFeature::NoOpener get_an_elements_noopener(URL::URL const& url, StringView target) const;
 
 private:
     SVGAElement(DOM::Document&, DOM::QualifiedName);
@@ -91,6 +57,43 @@ private:
     GC::Ptr<SVGAnimatedString> m_target;
 
     HTMLHyperlinkElementUtilsHack* m_hyperlink_utils;
+};
+
+class HTMLHyperlinkElementUtilsHack : public Web::HTML::HTMLHyperlinkElementUtils {
+public:
+    virtual ~HTMLHyperlinkElementUtilsHack();
+    HTMLHyperlinkElementUtilsHack(SVGAElement& svg_element, DOM::Document& document, DOM::Element& element)
+        : m_svg_element(svg_element)
+        , m_document(document)
+        , m_element(element)
+    {
+    }
+
+private:
+    SVGAElement& m_svg_element;
+    DOM::Document& m_document;
+    DOM::Element& m_element;
+
+    // ^HTML::HTMLHyperlinkElementUtils
+    virtual DOM::Document& hyperlink_element_utils_document() override { return m_document; }
+    virtual DOM::Element& hyperlink_element_utils_element() override { return m_element; }
+    virtual Optional<String> hyperlink_element_utils_href() const override;
+    virtual void set_hyperlink_element_utils_href(String) override;
+    virtual Optional<String> hyperlink_element_utils_referrerpolicy() const override;
+    virtual bool hyperlink_element_utils_is_html_anchor_element() const final { return true; }
+    virtual bool hyperlink_element_utils_is_connected() const final { return m_element.is_connected(); }
+    virtual void hyperlink_element_utils_queue_an_element_task(HTML::Task::Source source, Function<void()> steps) override
+    {
+        m_element.queue_an_element_task(source, move(steps));
+    }
+    virtual String hyperlink_element_utils_get_an_elements_target(Optional<String> target) const override
+    {
+        return m_svg_element.get_an_elements_target(target);
+    }
+    virtual Web::HTML::TokenizedFeature::NoOpener hyperlink_element_utils_get_an_elements_noopener(URL::URL const& url, StringView target) const override
+    {
+        return m_svg_element.get_an_elements_noopener(url, target);
+    }
 };
 
 }

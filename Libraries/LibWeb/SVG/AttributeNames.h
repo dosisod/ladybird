@@ -99,6 +99,7 @@ namespace Web::SVG::AttributeNames {
     __ENUMERATE_SVG_ATTRIBUTE(surfaceScale, "surfaceScale")               \
     __ENUMERATE_SVG_ATTRIBUTE(systemLanguage, "systemLanguage")           \
     __ENUMERATE_SVG_ATTRIBUTE(tableValues, "tableValues")                 \
+    __ENUMERATE_SVG_ATTRIBUTE(target, "target")                           \
     __ENUMERATE_SVG_ATTRIBUTE(targetX, "targetX")                         \
     __ENUMERATE_SVG_ATTRIBUTE(targetY, "targetY")                         \
     __ENUMERATE_SVG_ATTRIBUTE(textLength, "textLength")                   \
