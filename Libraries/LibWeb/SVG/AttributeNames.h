@@ -26,6 +26,7 @@ namespace Web::SVG::AttributeNames {
     __ENUMERATE_SVG_ATTRIBUTE(cy, "cy")                                   \
     __ENUMERATE_SVG_ATTRIBUTE(d, "d")                                     \
     __ENUMERATE_SVG_ATTRIBUTE(diffuseConstant, "diffuseConstant")         \
+    __ENUMERATE_SVG_ATTRIBUTE(download, "download")                       \
     __ENUMERATE_SVG_ATTRIBUTE(dx, "dx")                                   \
     __ENUMERATE_SVG_ATTRIBUTE(dy, "dy")                                   \
     __ENUMERATE_SVG_ATTRIBUTE(edgeMode, "edgeMode")                       \
@@ -43,6 +44,7 @@ namespace Web::SVG::AttributeNames {
     __ENUMERATE_SVG_ATTRIBUTE(in, "in")                                   \
     __ENUMERATE_SVG_ATTRIBUTE(in2, "in2")                                 \
     __ENUMERATE_SVG_ATTRIBUTE(intercept, "intercept")                     \
+    __ENUMERATE_SVG_ATTRIBUTE(ismap, "ismap")                             \
     __ENUMERATE_SVG_ATTRIBUTE(kernelMatrix, "kernelMatrix")               \
     __ENUMERATE_SVG_ATTRIBUTE(kernelUnitLength, "kernelUnitLength")       \
     __ENUMERATE_SVG_ATTRIBUTE(k1, "k1")                                   \
@@ -79,6 +81,8 @@ namespace Web::SVG::AttributeNames {
     __ENUMERATE_SVG_ATTRIBUTE(radius, "radius")                           \
     __ENUMERATE_SVG_ATTRIBUTE(refX, "refX")                               \
     __ENUMERATE_SVG_ATTRIBUTE(refY, "refY")                               \
+    __ENUMERATE_SVG_ATTRIBUTE(referrerpolicy, "referrerPolicy")           \
+    __ENUMERATE_SVG_ATTRIBUTE(rel, "rel")                                 \
     __ENUMERATE_SVG_ATTRIBUTE(repeatCount, "repeatCount")                 \
     __ENUMERATE_SVG_ATTRIBUTE(repeatDur, "repeatDur")                     \
     __ENUMERATE_SVG_ATTRIBUTE(requiredExtensions, "requiredExtensions")   \

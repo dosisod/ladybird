@@ -22,29 +22,6 @@ class Navigable;
 
 namespace Web::SVG {
 
-HTMLHyperlinkElementUtilsHack::HTMLHyperlinkElementUtilsHack(SVGElement& element, DOM::Document& document)
-    : m_element(element)
-    , m_document(document)
-{
-}
-
-HTMLHyperlinkElementUtilsHack::~HTMLHyperlinkElementUtilsHack() = default;
-
-Optional<String> HTMLHyperlinkElementUtilsHack::hyperlink_element_utils_href() const
-{
-    return m_element.attribute(HTML::AttributeNames::href);
-}
-
-void HTMLHyperlinkElementUtilsHack::set_hyperlink_element_utils_href(String href)
-{
-    m_element.set_attribute_value(HTML::AttributeNames::href, move(href));
-}
-
-Optional<String> HTMLHyperlinkElementUtilsHack::hyperlink_element_utils_referrerpolicy() const
-{
-    return m_element.attribute(HTML::AttributeNames::referrerpolicy);
-}
-
 GC_DEFINE_ALLOCATOR(SVGAElement);
 
 SVGAElement::SVGAElement(DOM::Document& document, DOM::QualifiedName qualified_name)
@@ -94,7 +71,7 @@ void SVGAElement::activation_behavior(Web::DOM::Event const& event)
     Optional<String> hyperlink_suffix {};
 
     // 3. If element is an a element, and event's target is an img with an ismap attribute specified, then:
-    if (event.target() && is<SVGImageElement>(*event.target()) && static_cast<SVGImageElement const&>(*event.target()).has_attribute(Web::HTML::AttributeNames::ismap)) {
+    if (event.target() && is<SVGImageElement>(*event.target()) && static_cast<SVGImageElement const&>(*event.target()).has_attribute(AttributeNames::ismap)) {
         // 1. Let x and y be 0.
         CSSPixels x { 0 };
         CSSPixels y { 0 };
@@ -135,21 +112,21 @@ void SVGAElement::activation_behavior(Web::DOM::Event const& event)
     // 7. Otherwise, follow the hyperlink created by element with hyperlinkSuffix set to hyperlinkSuffix and userInvolvement set to userInvolvement.
 
     if (m_hyperlink_utils == nullptr)
-        m_hyperlink_utils = new HTMLHyperlinkElementUtilsHack(*this, document());
+        m_hyperlink_utils = new SVGHyperlinkElementUtils(*this, document());
 
     m_hyperlink_utils->follow_the_hyperlink(hyperlink_suffix, user_involvement);
 }
 
 bool SVGAElement::has_download_preference() const
 {
-    return has_attribute(HTML::AttributeNames::download);
+    return has_attribute(AttributeNames::download);
 }
 
 void SVGAElement::attribute_changed(FlyString const& name, Optional<String> const& old_value, Optional<String> const& value, Optional<FlyString> const& namespace_)
 {
     Base::attribute_changed(name, old_value, value, namespace_);
 
-    if (name == SVG::AttributeNames::href) {
+    if (name == AttributeNames::href) {
         invalidate_style(
             DOM::StyleInvalidationReason::HTMLHyperlinkElementHrefChange,
             {
@@ -159,7 +136,7 @@ void SVGAElement::attribute_changed(FlyString const& name, Optional<String> cons
             },
             {});
     }
-    if (name == HTML::AttributeNames::rel) {
+    if (name == AttributeNames::rel) {
         if (m_rel_list)
             m_rel_list->associated_attribute_changed(value.value_or(String {}));
     }
@@ -176,7 +153,7 @@ i32 SVGAElement::default_tab_index_value() const
 GC::Ref<SVGAnimatedString> SVGAElement::target()
 {
     if (!m_target)
-        m_target = SVGAnimatedString::create(realm(), *this, DOM::QualifiedName { HTML::AttributeNames::target, OptionalNone {}, OptionalNone {} });
+        m_target = SVGAnimatedString::create(realm(), *this, DOM::QualifiedName { AttributeNames::target, OptionalNone {}, OptionalNone {} });
     return *m_target;
 }
 
@@ -185,7 +162,7 @@ GC::Ref<DOM::DOMTokenList> SVGAElement::rel_list()
 {
     // The relList IDL attribute reflects the ‘rel’ content attribute.
     if (!m_rel_list)
-        m_rel_list = DOM::DOMTokenList::create(*this, HTML::AttributeNames::rel);
+        m_rel_list = DOM::DOMTokenList::create(*this, AttributeNames::rel);
     return *m_rel_list;
 }
 

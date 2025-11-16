@@ -945,6 +945,7 @@ set(SOURCES
     SVG/SVGGeometryElement.cpp
     SVG/SVGGradientElement.cpp
     SVG/SVGGraphicsElement.cpp
+    SVG/SVGHyperlinkElementUtils.cpp
     SVG/SVGImageElement.cpp
     SVG/SVGLength.cpp
     SVG/SVGLengthList.cpp

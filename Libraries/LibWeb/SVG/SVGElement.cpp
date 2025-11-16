@@ -179,7 +179,7 @@ Web::HTML::TokenizedFeature::NoOpener SVGElement::get_an_elements_noopener(URL::
 {
     // To get an element's noopener, given an a, area, or form element element, a URL record url, and a string target,
     // perform the following steps. They return a boolean.
-    auto rel = MUST(get_attribute_value(HTML::AttributeNames::rel).to_lowercase());
+    auto rel = MUST(get_attribute_value(AttributeNames::rel).to_lowercase());
     auto link_types = rel.bytes_as_string_view().split_view_if(Infra::is_ascii_whitespace);
 
     // 1. If element's link types include the noopener or noreferrer keyword, then return true.
@@ -231,7 +231,7 @@ bool SVGElement::should_include_in_accessibility_tree() const
 Optional<ARIA::Role> SVGElement::default_role() const
 {
     // https://w3c.github.io/svg-aam/#mapping_role_table
-    if (local_name() == TagNames::a && (has_attribute(SVG::AttributeNames::href) || has_attribute(AttributeNames::xlink_href)))
+    if (local_name() == TagNames::a && (has_attribute(AttributeNames::href) || has_attribute(AttributeNames::xlink_href)))
         return ARIA::Role::link;
     if (local_name().is_one_of(TagNames::foreignObject, TagNames::g)
         && should_include_in_accessibility_tree())
