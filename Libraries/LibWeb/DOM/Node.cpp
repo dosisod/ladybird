@@ -155,7 +155,7 @@ SVG::SVGAElement* Node::enclosing_svg_link_element()
         auto* anchor_element = as_if<SVG::SVGAElement>(*node);
         if (!anchor_element)
             continue;
-        if (anchor_element->has_attribute(HTML::AttributeNames::href))
+        if (anchor_element->has_attribute(SVG::AttributeNames::href))
             return anchor_element;
     }
     return nullptr;
