@@ -20,4 +20,4 @@ interface SVGAElement : SVGGraphicsElement {
 };
 
 SVGAElement includes SVGURIReference;
-// FIXME: SVGAElement includes HTMLHyperlinkElementUtils;
+// SVGAElement includes HTMLHyperlinkElementUtils;

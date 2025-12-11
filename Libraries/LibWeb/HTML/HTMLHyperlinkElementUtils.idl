@@ -1,5 +1,6 @@
 // https://html.spec.whatwg.org/multipage/links.html#htmlhyperlinkelementutils
 interface mixin HTMLHyperlinkElementUtils {
+    // [CEReactions, ReflectSetter] stringifier attribute USVString href;
     [CEReactions] stringifier attribute USVString href;
     readonly attribute USVString origin;
     [CEReactions] attribute USVString protocol;
