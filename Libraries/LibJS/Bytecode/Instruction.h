@@ -111,6 +111,11 @@ public:
 
     size_t offset() const { return m_ptr - m_begin; }
     bool at_end() const { return m_ptr >= m_end; }
+    void rewind(size_t to)
+    {
+        VERIFY(to < (uintptr_t)m_end - (uintptr_t)m_begin);
+        m_ptr = m_begin + to;
+    }
 
     Instruction const& operator*() const { return dereference(); }
 
