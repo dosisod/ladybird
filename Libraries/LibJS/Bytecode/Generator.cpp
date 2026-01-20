@@ -364,104 +364,119 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
             source_map.set(bytecode.size() + offset, source_record);
         }
 
-        Bytecode::InstructionStreamIterator it(block->instruction_stream());
-        while (!it.at_end()) {
-            auto& instruction = const_cast<Instruction&>(*it);
+        auto peephole = [&](Bytecode::InstructionStreamIterator it) {
+            Vector<u8> bytecode {};
+            while (!it.at_end()) {
+                auto& instruction = const_cast<Instruction&>(*it);
 
-            if (instruction.type() == Instruction::Type::Mov) {
-                auto position = it.offset();
-                ++it;
-
-                auto& next_instruction = const_cast<Instruction&>(*it);
-
-                if (next_instruction.type() == Instruction::Type::Return) {
-                    auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
-                    auto& ret = static_cast<Bytecode::Op::Return const&>(*it);
-
-                    // OPTIMIZATION: Moved value is not returned, so it is dead. Skip emit
-                    if (mov.dst() != ret.value())
-                        continue;
-
-                    // OPTIMIZATION: Moved value can be returned directly
-                    Op::Return return_op(mov.src());
-
-                    bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
+                if (instruction.type() == Instruction::Type::Mov) {
+                    auto position = it.offset();
                     ++it;
 
-                    continue;
-                }
+                    auto& next_instruction = const_cast<Instruction&>(*it);
 
-                it.rewind(position);
-            }
+                    if (next_instruction.type() == Instruction::Type::Return) {
+                        auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                        auto& ret = static_cast<Bytecode::Op::Return const&>(*it);
 
-            if (instruction.type() == Instruction::Type::Jump) {
-                auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
+                        // OPTIMIZATION: Moved value is not returned, so it is dead. Skip emit
+                        if (mov.dst() != ret.value())
+                            continue;
 
-                // OPTIMIZATION: Don't emit jumps that just jump to the next block.
-                if (jump.target().basic_block_index() == block->index() + 1) {
-                    if (basic_block_start_offsets.last() == bytecode.size()) {
-                        // This block is empty, just skip it.
-                        basic_block_start_offsets.take_last();
-                    }
-                    ++it;
-                    continue;
-                }
+                        // OPTIMIZATION: Moved value can be returned directly
+                        Op::Return return_op(mov.src());
 
-                // OPTIMIZATION: For jumps to a return-or-end-only block, we can emit a `Return` or `End` directly instead.
-                auto& target_block = *generator.m_root_basic_blocks[jump.target().basic_block_index()];
-                if (target_block.is_terminated()) {
-                    auto target_instruction_iterator = InstructionStreamIterator { target_block.instruction_stream() };
-                    auto& target_instruction = *target_instruction_iterator;
-
-                    if (target_instruction.type() == Instruction::Type::Return) {
-                        auto& return_instruction = static_cast<Bytecode::Op::Return const&>(target_instruction);
-                        Op::Return return_op(return_instruction.value());
                         bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
                         ++it;
+
                         continue;
                     }
 
-                    if (target_instruction.type() == Instruction::Type::End) {
-                        auto& return_instruction = static_cast<Bytecode::Op::End const&>(target_instruction);
-                        Op::End end_op(return_instruction.value());
-                        bytecode.append(reinterpret_cast<u8 const*>(&end_op), end_op.length());
+                    it.rewind(position);
+                }
+
+                if (instruction.type() == Instruction::Type::Jump) {
+                    auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
+
+                    // OPTIMIZATION: Don't emit jumps that just jump to the next block.
+                    if (jump.target().basic_block_index() == block->index() + 1) {
+                        if (basic_block_start_offsets.last() == bytecode.size()) {
+                            // This block is empty, just skip it.
+                            basic_block_start_offsets.take_last();
+                        }
+                        ++it;
+                        continue;
+                    }
+
+                    // OPTIMIZATION: For jumps to a return-or-end-only block, we can emit a `Return` or `End` directly instead.
+                    auto& target_block = *generator.m_root_basic_blocks[jump.target().basic_block_index()];
+                    if (target_block.is_terminated()) {
+                        auto target_instruction_iterator = InstructionStreamIterator { target_block.instruction_stream() };
+                        auto& target_instruction = *target_instruction_iterator;
+
+                        if (target_instruction.type() == Instruction::Type::Return) {
+                            auto& return_instruction = static_cast<Bytecode::Op::Return const&>(target_instruction);
+                            Op::Return return_op(return_instruction.value());
+                            bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
+                            ++it;
+                            continue;
+                        }
+
+                        if (target_instruction.type() == Instruction::Type::End) {
+                            auto& return_instruction = static_cast<Bytecode::Op::End const&>(target_instruction);
+                            Op::End end_op(return_instruction.value());
+                            bytecode.append(reinterpret_cast<u8 const*>(&end_op), end_op.length());
+                            ++it;
+                            continue;
+                        }
+                    }
+                }
+
+                // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
+                //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
+                if (instruction.type() == Instruction::Type::JumpIf) {
+                    auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
+                    if (jump.true_target().basic_block_index() == block->index() + 1) {
+                        Op::JumpFalse jump_false(jump.condition(), Label { jump.false_target() });
+                        bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
+                        ++it;
+                        continue;
+                    }
+                    if (jump.false_target().basic_block_index() == block->index() + 1) {
+                        Op::JumpTrue jump_true(jump.condition(), Label { jump.true_target() });
+                        bytecode.append(reinterpret_cast<u8 const*>(&jump_true), jump_true.length());
                         ++it;
                         continue;
                     }
                 }
-            }
 
-            // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
-            //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
-            if (instruction.type() == Instruction::Type::JumpIf) {
-                auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
-                if (jump.true_target().basic_block_index() == block->index() + 1) {
-                    Op::JumpFalse jump_false(jump.condition(), Label { jump.false_target() });
-                    auto& label = jump_false.target();
-                    size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&jump_false));
-                    label_offsets.append(label_offset);
-                    bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
-                    ++it;
-                    continue;
-                }
-                if (jump.false_target().basic_block_index() == block->index() + 1) {
-                    Op::JumpTrue jump_true(jump.condition(), Label { jump.true_target() });
-                    auto& label = jump_true.target();
-                    size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&jump_true));
-                    label_offsets.append(label_offset);
-                    bytecode.append(reinterpret_cast<u8 const*>(&jump_true), jump_true.length());
-                    ++it;
-                    continue;
-                }
+                bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                ++it;
             }
+            return bytecode;
+        };
+
+        Bytecode::InstructionStreamIterator it(block->instruction_stream());
+        auto bb_bytecode = peephole(it);
+        Bytecode::InstructionStreamIterator it2(bb_bytecode);
+        auto bb_bytecode2 = peephole(it2);
+        Bytecode::InstructionStreamIterator it3(bb_bytecode);
+        auto bb_bytecode3 = peephole(it3);
+
+        Bytecode::InstructionStreamIterator itz(bb_bytecode3);
+        while (!itz.at_end()) {
+            auto& instruction = const_cast<Instruction&>(*itz);
 
             instruction.visit_labels([&](Label& label) {
-                size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
+                size_t label_offset = bytecode.size() + itz.offset() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
                 label_offsets.append(label_offset);
             });
-            bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
-            ++it;
+
+            ++itz;
         }
+
+        bytecode.extend(bb_bytecode3);
+
         if (!block->is_terminated()) {
             Op::End end(*undefined_constant);
             bytecode.append(reinterpret_cast<u8 const*>(&end), end.length());
