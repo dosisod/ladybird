@@ -474,6 +474,7 @@ Bytecode::CodeGenerationErrorOr<Optional<ScopedOperand>> Identifier::generate_by
                 // trigger the TDZ check.
                 generator.emit<Bytecode::Op::Mov>(local, generator.add_constant(js_special_empty_value()));
             }
+            // dbgln("ident emit throw TDZ");
             generator.emit<Bytecode::Op::ThrowIfTDZ>(local);
         }
         return local;
@@ -642,6 +643,7 @@ Bytecode::CodeGenerationErrorOr<Optional<ScopedOperand>> AssignmentExpression::g
                         auto is_initialized = generator.is_local_initialized(identifier.local_index());
                         auto is_lexically_declared = generator.is_local_lexically_declared(identifier.local_index());
                         if (is_lexically_declared && !is_initialized) {
+                            // dbgln("assign emit throw TDZ");
                             generator.emit<Bytecode::Op::ThrowIfTDZ>(generator.local(identifier.local_index()));
                         }
                     }
@@ -1786,6 +1788,7 @@ Bytecode::CodeGenerationErrorOr<Optional<ScopedOperand>> CallExpression::generat
         if (identifier.is_local()) {
             auto local = generator.local(identifier.local_index());
             if (!generator.is_local_initialized(local.operand().index())) {
+                // dbgln("call expr emit throw TDZ");
                 generator.emit<Bytecode::Op::ThrowIfTDZ>(local);
             }
             original_callee = local;

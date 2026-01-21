@@ -371,25 +371,33 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
 
                 if (instruction.type() == Instruction::Type::Mov) {
                     auto position = it.offset();
+                    // dbgln("Is at end? {}", it.at_end());
                     ++it;
+                    // dbgln("Is at end? {}", it.at_end());
 
-                    auto& next_instruction = const_cast<Instruction&>(*it);
+                    if (it.at_end()) {
+                        // dbgln("oof at end");
+                    } else {
+                        auto& next_instruction = const_cast<Instruction&>(*it);
 
-                    if (next_instruction.type() == Instruction::Type::Return) {
-                        auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
-                        auto& ret = static_cast<Bytecode::Op::Return const&>(*it);
+                        if (next_instruction.type() == Instruction::Type::Return) {
+                            auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                            auto& ret = static_cast<Bytecode::Op::Return const&>(*it);
 
-                        // OPTIMIZATION: Moved value is not returned, so it is dead. Skip emit
-                        if (mov.dst() != ret.value())
-                            continue;
+                            if (mov.dst() == ret.value()) {
 
-                        // OPTIMIZATION: Moved value can be returned directly
-                        Op::Return return_op(mov.src());
+                                // OPTIMIZATION: Moved value can be returned directly
+                                Op::Return return_op(mov.src());
 
-                        bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
-                        ++it;
+                                // dbgln("optimizing return");
+                                bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
+                                ++it;
 
-                        continue;
+                                continue;
+                            } else {
+                                // dbgln("wouldve removed MOV");
+                            }
+                        }
                     }
 
                     it.rewind(position);
@@ -460,7 +468,7 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
         auto bb_bytecode = peephole(it);
         Bytecode::InstructionStreamIterator it2(bb_bytecode);
         auto bb_bytecode2 = peephole(it2);
-        Bytecode::InstructionStreamIterator it3(bb_bytecode);
+        Bytecode::InstructionStreamIterator it3(bb_bytecode2);
         auto bb_bytecode3 = peephole(it3);
 
         Bytecode::InstructionStreamIterator itz(bb_bytecode3);
