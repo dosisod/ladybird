@@ -370,32 +370,23 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
                 auto& instruction = const_cast<Instruction&>(*it);
 
                 if (instruction.type() == Instruction::Type::Mov) {
-                    auto position = it.offset();
-                    ++it;
+                    if (auto next = it.peek(Instruction::Type::Return); next.has_value()) {
+                        auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                        auto& ret = static_cast<Bytecode::Op::Return const&>(*next);
 
-                    if (!it.at_end()) {
-                        auto& next_instruction = const_cast<Instruction&>(*it);
-
-                        if (next_instruction.type() == Instruction::Type::Return) {
-                            auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
-                            auto& ret = static_cast<Bytecode::Op::Return const&>(*it);
-
-                            // OPTIMIZATION: Moved value is not returned, so move is redundant
-                            // TODO: replace with proper dead store pass
-                            if (mov.dst() != ret.value())
-                                continue;
-
-                            // OPTIMIZATION: Moved value can be returned directly
-                            Op::Return return_op(mov.src());
-
-                            bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
-                            ++it;
-
+                        // OPTIMIZATION: Moved value is not returned, so move is redundant
+                        // TODO: replace with proper dead store pass
+                        if (mov.dst() != ret.value())
                             continue;
-                        }
-                    }
 
-                    it.rewind(position);
+                        // OPTIMIZATION: Moved value can be returned directly
+                        Op::Return return_op(mov.src());
+
+                        bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
+                        ++it;
+
+                        continue;
+                    }
                 }
 
                 if (instruction.type() == Instruction::Type::Jump) {

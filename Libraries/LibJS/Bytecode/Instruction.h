@@ -111,11 +111,6 @@ public:
 
     size_t offset() const { return m_ptr - m_begin; }
     bool at_end() const { return m_ptr >= m_end; }
-    void rewind(size_t to)
-    {
-        VERIFY(to < (uintptr_t)m_end - (uintptr_t)m_begin);
-        m_ptr = m_begin + to;
-    }
 
     Instruction const& operator*() const { return dereference(); }
 
@@ -124,10 +119,36 @@ public:
         m_ptr += dereference().length();
     }
 
+    [[nodiscard]] Optional<Instruction const&> peek(Instruction::Type type)
+    {
+        VERIFY(!at_end());
+
+        auto position = offset();
+        ++(*this);
+
+        if (at_end()) {
+            rewind(position);
+            return {};
+        }
+
+        auto& next = dereference();
+        if (next.type() == type)
+            return next;
+
+        rewind(position);
+        return {};
+    }
+
     Executable const* executable() const { return m_executable; }
 
 private:
     Instruction const& dereference() const { return *reinterpret_cast<Instruction const*>(m_ptr); }
+
+    void rewind(size_t to)
+    {
+        VERIFY(to < (uintptr_t)m_end - (uintptr_t)m_begin);
+        m_ptr = m_begin + to;
+    }
 
     u8 const* m_begin { nullptr };
     u8 const* m_end { nullptr };
