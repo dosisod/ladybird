@@ -450,26 +450,26 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
             return bytecode;
         };
 
-        Bytecode::InstructionStreamIterator it(block->instruction_stream());
-        auto bb_bytecode = peephole(it);
-        Bytecode::InstructionStreamIterator it2(bb_bytecode);
-        auto bb_bytecode2 = peephole(it2);
-        Bytecode::InstructionStreamIterator it3(bb_bytecode2);
-        auto bb_bytecode3 = peephole(it3);
+        Vector<u8> block_bytecode(block->instruction_stream());
 
-        Bytecode::InstructionStreamIterator itz(bb_bytecode3);
-        while (!itz.at_end()) {
-            auto& instruction = const_cast<Instruction&>(*itz);
+        for (size_t i = 0; i < 3; i++) {
+            Bytecode::InstructionStreamIterator it(block_bytecode);
+            block_bytecode = peephole(it);
+        }
+
+        Bytecode::InstructionStreamIterator it(block_bytecode);
+        while (!it.at_end()) {
+            auto& instruction = const_cast<Instruction&>(*it);
 
             instruction.visit_labels([&](Label& label) {
-                size_t label_offset = bytecode.size() + itz.offset() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
+                size_t label_offset = bytecode.size() + it.offset() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
                 label_offsets.append(label_offset);
             });
 
-            ++itz;
+            ++it;
         }
 
-        bytecode.extend(bb_bytecode3);
+        bytecode.extend(block_bytecode);
 
         if (!block->is_terminated()) {
             Op::End end(*undefined_constant);
