@@ -98,6 +98,7 @@ inline void TestRunner::run(ReadonlySpan<ByteString> test_globs)
         if (!any_of(test_globs, [&](auto& glob) { return path.matches(glob); }))
             continue;
         ++progress_counter;
+        dbgln("running: {}", path);
         do_run_single_test(path, progress_counter, test_paths.size());
         if (m_print_progress)
             warn("\033]9;{};{};\033\\", progress_counter, test_paths.size());

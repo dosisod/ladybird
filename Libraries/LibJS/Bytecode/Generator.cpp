@@ -452,11 +452,12 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
 
         Vector<u8> block_bytecode(block->instruction_stream());
 
-        for (size_t i = 0; i < 3; i++) {
+        for (size_t i = 0; i < 1; i++) {
             Bytecode::InstructionStreamIterator it(block_bytecode);
             block_bytecode = peephole(it);
         }
 
+        /*
         Bytecode::InstructionStreamIterator it(block_bytecode);
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
@@ -468,6 +469,7 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
 
             ++it;
         }
+        */
 
         bytecode.extend(block_bytecode);
 
@@ -479,6 +481,60 @@ CodeGenerationErrorOr<GC::Ref<Executable>> Generator::compile(VM& vm, ASTNode co
             unlinked_exception_handlers.last().end_offset = bytecode.size();
         }
     }
+
+        Bytecode::InstructionStreamIterator it(bytecode);
+        HashTable<Operand> touched_operands;
+        while (!it.at_end()) {
+            auto& instruction = const_cast<Instruction&>(*it);
+
+            if (instruction.type() == Instruction::Type::Mov) {
+                auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                touched_operands.set(mov.src());
+            }
+            else {
+                instruction.visit_operands([&](Operand& operand) {
+                    touched_operands.set(operand);
+                });
+            }
+
+            ++it;
+        }
+
+        Vector<u8> new_bytecode;
+
+        it = Bytecode::InstructionStreamIterator(bytecode);
+        while (!it.at_end()) {
+            auto& instruction = const_cast<Instruction&>(*it);
+
+            if (instruction.type() == Instruction::Type::Mov) {
+                auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+
+                if (!touched_operands.contains(mov.dst())) {
+                    dbgln("Skipping dest");
+                    ++it;
+                    continue;
+                }
+            }
+
+            new_bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+            ++it;
+        }
+        bytecode = new_bytecode;
+
+
+        it = Bytecode::InstructionStreamIterator(bytecode);
+        while (!it.at_end()) {
+            auto& instruction = const_cast<Instruction&>(*it);
+
+            instruction.visit_labels([&](Label& label) {
+                size_t label_offset = it.offset() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
+                dbgln("Label offset: {:x}", label_offset);
+                label_offsets.append(label_offset);
+            });
+            ++it;
+        }
+
+
     for (auto label_offset : label_offsets) {
         auto& label = *reinterpret_cast<Label*>(bytecode.data() + label_offset);
         auto* block = generator.m_root_basic_blocks[label.basic_block_index()].ptr();

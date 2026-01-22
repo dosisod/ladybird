@@ -157,4 +157,10 @@ private:
     JS::Bytecode::Operand m_value { JS::Bytecode::Operand::ShouldMakeInvalid::Indeed };
 };
 
+template<>
+struct Traits<JS::Bytecode::Operand> : DefaultTraits<JS::Bytecode::Operand> {
+    static unsigned hash(JS::Bytecode::Operand value) { return Traits<u64>::hash(value.raw()); }
+    static constexpr bool is_trivial() { return true; }
+};
+
 }
