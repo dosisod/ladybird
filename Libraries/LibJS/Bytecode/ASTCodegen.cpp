@@ -300,10 +300,15 @@ Optional<ScopedOperand> BinaryExpression::generate_bytecode(Bytecode::Generator&
         generator.emit<Bytecode::Op::StrictlyEquals>(dst, lhs, rhs);
         break;
     case BinaryOp::BitwiseAnd:
+        if (auto constant = generator.try_get_constant(rhs); constant.has_value() && constant->is_int32() && constant->as_i32() == -1) {
+            // OPTIMIZATION: x & -1 == ToInt32(x)
+            generator.emit<Bytecode::Op::ToInt32>(dst, lhs);
+            break;
+        }
         generator.emit<Bytecode::Op::BitwiseAnd>(dst, lhs, rhs);
         break;
     case BinaryOp::BitwiseOr:
-        if (rhs.operand().is_constant() && generator.get_constant(rhs).is_int32() && generator.get_constant(rhs).as_i32() == 0) {
+        if (auto constant = generator.try_get_constant(rhs); constant.has_value() && constant->is_int32() && constant->as_i32() == 0) {
             // OPTIMIZATION: x | 0 == ToInt32(x)
             generator.emit<Bytecode::Op::ToInt32>(dst, lhs);
             break;
@@ -311,6 +316,11 @@ Optional<ScopedOperand> BinaryExpression::generate_bytecode(Bytecode::Generator&
         generator.emit<Bytecode::Op::BitwiseOr>(dst, lhs, rhs);
         break;
     case BinaryOp::BitwiseXor:
+        if (auto constant = generator.try_get_constant(rhs); constant.has_value() && constant->is_int32() && constant->as_i32() == 0) {
+            // OPTIMIZATION: x ^ 0 == ToInt32(x)
+            generator.emit<Bytecode::Op::ToInt32>(dst, lhs);
+            break;
+        }
         generator.emit<Bytecode::Op::BitwiseXor>(dst, lhs, rhs);
         break;
     case BinaryOp::LeftShift:
@@ -433,8 +443,8 @@ Optional<ScopedOperand> UnaryExpression::generate_bytecode(Bytecode::Generator& 
 
     Optional<ScopedOperand> src;
     // Typeof needs some special handling for when the LHS is an Identifier. Namely, it shouldn't throw on unresolvable references, but instead return "undefined".
-    // Skip Not operator as it needs to be evaluated breadth first in order to detect `!!` optimization (otherwise the inner `!x` would eval first).
-    if (m_op != UnaryOp::Typeof && m_op != UnaryOp::Not)
+    // Skip logical and bitwise Not operator here in order to check for `!!` and `~~` optimization later.
+    if (m_op != UnaryOp::Typeof && m_op != UnaryOp::Not && m_op != UnaryOp::BitwiseNot)
         src = m_lhs->generate_bytecode(generator).value();
 
     auto dst = choose_dst(generator, preferred_dst);
@@ -446,6 +456,21 @@ Optional<ScopedOperand> UnaryExpression::generate_bytecode(Bytecode::Generator& 
 
     switch (m_op) {
     case UnaryOp::BitwiseNot:
+        if (auto nested = as_if<UnaryExpression>(*m_lhs); nested && nested->op() == UnaryOp::BitwiseNot) {
+            auto value = nested->lhs()->generate_bytecode(generator).value();
+
+            if (value.operand().is_constant())
+                return generator.add_constant(Value(generator.get_constant(value).as_i32()));
+
+            generator.emit<Bytecode::Op::ToInt32>(dst, value);
+            break;
+        }
+
+        src = m_lhs->generate_bytecode(generator).value();
+
+        if (auto result = try_constant_fold_unary_expression(generator, *src, m_op); result.has_value())
+            return result.release_value();
+
         generator.emit<Bytecode::Op::BitwiseNot>(dst, *src);
         break;
     case UnaryOp::Not:
