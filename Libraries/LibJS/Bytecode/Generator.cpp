@@ -422,25 +422,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     }
                 }
 
-                if (instruction.type() == Instruction::Type::ToInt32) {
-                    if (auto next = it.peek(Instruction::Type::Mov); next.has_value()) {
-                        auto& to_i32 = static_cast<Bytecode::Op::ToInt32 const&>(instruction);
-                        auto& mov = static_cast<Bytecode::Op::Mov const&>(*next);
-
-                        // OPTIMIZATION: store to same register instead of doing move
-                        if (to_i32.value() == mov.dst()) {
-                            Op::ToInt32 to_i32_op(to_i32.value(), to_i32.value());
-                            bytecode.append(reinterpret_cast<u8 const*>(&to_i32_op), to_i32_op.length());
-                            ++it;
-
-                            continue;
-                        }
-
-                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
-                        continue;
-                    }
-                }
-
                 if (instruction.type() == Instruction::Type::Jump) {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
 
