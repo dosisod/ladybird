@@ -327,6 +327,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
     auto number_of_registers = generator.m_next_register;
     auto number_of_constants = generator.m_constants.size();
     auto number_of_locals = local_variable_names.size();
+    HashTable<u32> dead_operands;
+    HashTable<u32> seen_operands;
 
     u32 max_argument_index = 0;
 
@@ -337,7 +339,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
             auto& instruction = const_cast<Instruction&>(*it);
 
             // NB: The layout in ExecutionContext is: [registers | locals | constants | arguments]
-            instruction.visit_operands([number_of_registers, number_of_constants, number_of_locals, &max_argument_index](Operand& operand) {
+            instruction.visit_operands([&](Operand& operand) {
                 switch (operand.type()) {
                 case Operand::Type::Register:
                     break;
@@ -356,9 +358,27 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 }
             });
 
+            if (instruction.type() == Instruction::Type::Mov) {
+                auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                seen_operands.set(mov.src().raw());
+
+                instruction.visit_operands([&](Operand& op) {
+                    dead_operands.set(op.raw());
+                });
+            } else {
+                instruction.visit_operands([&](Operand& op) {
+                    seen_operands.set(op.raw());
+                    dead_operands.set(op.raw());
+                });
+            }
+
             ++it;
         }
     }
+
+    dead_operands.remove_all_matching([&seen_operands](u32 op) {
+        return seen_operands.contains(op);
+    });
 
     // Also rewrite the `undefined` constant if we have one for inserting End.
     if (undefined_constant.has_value())
@@ -396,6 +416,14 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         Bytecode::InstructionStreamIterator it(block->instruction_stream());
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
+
+            if (instruction.type() == Instruction::Type::Mov) {
+                auto& mov = static_cast<Bytecode::Op::Mov&>(instruction);
+                if (dead_operands.contains(mov.dst().raw())) {
+                    ++it;
+                    continue;
+                }
+            }
 
             if (instruction.type() == Instruction::Type::Jump) {
                 auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
