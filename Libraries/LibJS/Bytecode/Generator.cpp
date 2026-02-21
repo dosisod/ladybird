@@ -411,8 +411,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
             source_map.append({ static_cast<u32>(bytecode.size()), record });
         };
 
-        auto peephole = [&](Bytecode::InstructionStreamIterator& it) {
-            Vector<u8> bytecode {};
+        auto peephole = [&](Bytecode::InstructionStreamIterator& it, size_t old_size = 0) {
+            Vector<u8> bytecode;
+            bytecode.ensure_capacity(old_size);
             while (!it.at_end()) {
                 auto& instruction = const_cast<Instruction&>(*it);
 
@@ -536,23 +537,24 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
         for (size_t i = 0; i < 3; i++) {
             Bytecode::InstructionStreamIterator it(block_bytecode);
-            block_bytecode = peephole(it);
+            block_bytecode = peephole(it, block_bytecode.size());
         }
+
+        bytecode.grow_capacity(block_bytecode.size());
 
         Bytecode::InstructionStreamIterator it(block_bytecode);
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
 
             instruction.visit_labels([&](Label& label) {
-                size_t label_offset = bytecode.size() + it.offset() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
+                size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
                 label_offsets.append(label_offset);
             });
             emit_source_map_entry(it.offset());
+            bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
 
             ++it;
         }
-
-        bytecode.extend(block_bytecode);
 
         if (!block->is_terminated()) {
             Op::End end(*undefined_constant);
