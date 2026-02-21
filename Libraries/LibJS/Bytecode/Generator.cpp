@@ -418,8 +418,14 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 auto& instruction = const_cast<Instruction&>(*it);
 
                 if (instruction.type() == Instruction::Type::Mov) {
+                    auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+
+                    if (dead_operands.contains(mov.dst().raw())) {
+                        ++it;
+                        continue;
+                    }
+
                     if (auto next = it.peek(Instruction::Type::Return); next.has_value()) {
-                        auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
                         auto& ret = static_cast<Bytecode::Op::Return const&>(*next);
 
                         // OPTIMIZATION: Moved value is not returned, so move is redundant
@@ -437,7 +443,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     }
 
                     if (auto next = it.peek(Instruction::Type::Mov); next.has_value()) {
-                        auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
                         auto& mov_next = static_cast<Bytecode::Op::Mov const&>(*next);
 
                         // OPTIMIZATION: move destination will immediately be overriden, skip emit
