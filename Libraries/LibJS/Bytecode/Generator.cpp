@@ -475,8 +475,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         if (target_instruction.type() == Instruction::Type::Return) {
                             auto& return_instruction = static_cast<Bytecode::Op::Return const&>(target_instruction);
                             Op::Return return_op(return_instruction.value());
-                            //if (is_final_peephole)
-                            //    emit_source_map_entry(it.offset());
                             bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
                             ++it;
                             continue;
@@ -485,8 +483,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         if (target_instruction.type() == Instruction::Type::End) {
                             auto& return_instruction = static_cast<Bytecode::Op::End const&>(target_instruction);
                             Op::End end_op(return_instruction.value());
-                            //if (is_final_peephole)
-                            //    emit_source_map_entry(it.offset());
                             bytecode.append(reinterpret_cast<u8 const*>(&end_op), end_op.length());
                             ++it;
                             continue;
@@ -500,26 +496,12 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
                     if (jump.true_target().basic_block_index() == block->index() + 1) {
                         Op::JumpFalse jump_false(jump.condition(), Label { jump.false_target() });
-                        /*
-                        auto& label = jump_false.target();
-                        size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&jump_false));
-                        label_offsets.append(label_offset);
-                        */
-                        //if (is_final_peephole)
-                        //    emit_source_map_entry(it.offset());
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
                         ++it;
                         continue;
                     }
                     if (jump.false_target().basic_block_index() == block->index() + 1) {
                         Op::JumpTrue jump_true(jump.condition(), Label { jump.true_target() });
-                        /*
-                        auto& label = jump_true.target();
-                        size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&jump_true));
-                        label_offsets.append(label_offset);
-                        */
-                        //if (is_final_peephole)
-                        //    emit_source_map_entry(it.offset());
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_true), jump_true.length());
                         ++it;
                         continue;
