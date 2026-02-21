@@ -509,6 +509,11 @@ public:
         iterator.m_bucket = nullptr;
     }
 
+    void remove(HashTable const& exclude)
+    {
+        remove_all_matching([&exclude](auto item) { return exclude.contains(item); });
+    }
+
     template<typename TUnaryPredicate>
     bool remove_all_matching(TUnaryPredicate const& predicate)
     {

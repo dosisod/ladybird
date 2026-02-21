@@ -376,9 +376,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         }
     }
 
-    dead_operands.remove_all_matching([&seen_operands](u32 op) {
-        return seen_operands.contains(op);
-    });
+    dead_operands.remove(seen_operands);
 
     // Also rewrite the `undefined` constant if we have one for inserting End.
     if (undefined_constant.has_value())
