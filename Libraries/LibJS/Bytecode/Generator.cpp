@@ -332,31 +332,12 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
     u32 max_argument_index = 0;
 
-    // Pass: Rewrite the bytecode to use the correct register and constant indices.
+    // Find operands which are written, but never read
+    // TODO: move to peephole pass
     for (auto& block : generator.m_root_basic_blocks) {
         Bytecode::InstructionStreamIterator it(block->instruction_stream());
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
-
-            // NB: The layout in ExecutionContext is: [registers | locals | constants | arguments]
-            instruction.visit_operands([&](Operand& operand) {
-                switch (operand.type()) {
-                case Operand::Type::Register:
-                    break;
-                case Operand::Type::Local:
-                    operand.offset_index_by(number_of_registers);
-                    break;
-                case Operand::Type::Constant:
-                    operand.offset_index_by(number_of_registers + number_of_locals);
-                    break;
-                case Operand::Type::Argument:
-                    max_argument_index = max(max_argument_index, operand.index());
-                    operand.offset_index_by(number_of_registers + number_of_locals + number_of_constants);
-                    break;
-                default:
-                    VERIFY_NOT_REACHED();
-                }
-            });
 
             if (instruction.type() == Instruction::Type::Mov) {
                 auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
@@ -529,6 +510,27 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         Bytecode::InstructionStreamIterator it(block_bytecode);
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
+
+            // Pass: Rewrite the bytecode to use the correct register and constant indices.
+            // NB: The layout in ExecutionContext is: [registers | locals | constants | arguments]
+            instruction.visit_operands([&](Operand& operand) {
+                switch (operand.type()) {
+                case Operand::Type::Register:
+                    break;
+                case Operand::Type::Local:
+                    operand.offset_index_by(number_of_registers);
+                    break;
+                case Operand::Type::Constant:
+                    operand.offset_index_by(number_of_registers + number_of_locals);
+                    break;
+                case Operand::Type::Argument:
+                    max_argument_index = max(max_argument_index, operand.index());
+                    operand.offset_index_by(number_of_registers + number_of_locals + number_of_constants);
+                    break;
+                default:
+                    VERIFY_NOT_REACHED();
+                }
+            });
 
             instruction.visit_labels([&](Label& label) {
                 size_t label_offset = bytecode.size() + (bit_cast<FlatPtr>(&label) - bit_cast<FlatPtr>(&instruction));
