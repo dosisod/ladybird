@@ -407,6 +407,12 @@ public:
         return m_constants[operand.operand().index()];
     }
 
+    [[nodiscard]] Value get_constant(Operand const& operand) const
+    {
+        VERIFY(operand.is_constant());
+        return m_constants[operand.index()];
+    }
+
     [[nodiscard]] Optional<Value> try_get_constant(ScopedOperand const& operand) const
     {
         if (operand.operand().is_constant())

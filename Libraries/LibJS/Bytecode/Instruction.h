@@ -39,6 +39,21 @@ namespace JS::Bytecode::Op {
     X(StrictlyEquals, strict_equals, ==)          \
     X(StrictlyInequals, strict_inequals, !=)
 
+#define JS_ENUMERATE_BINARY_OPS(X)                \
+    X(Add, add, +)                                \
+    X(Sub, sub, -)                                \
+    X(Sub, sub, -)                                \
+    X(Mul, mul, *)                                \
+    X(Div, div, /)                                \
+    X(Mod, mod, %)                                \
+    X(Exp, exp, **)                               \
+    X(BitwiseAnd, bitwise_and, &)                 \
+    X(BitwiseOr, bitwise_or, |)                   \
+    X(BitwiseXor, bitwise_xor, ^)                 \
+    X(LeftShift, left_shuft, <<)                  \
+    X(RightShift, right_shift, >>)                \
+    X(UnsignedRightShift, unsigned_right_shift, >>>)
+
 enum class EnvironmentMode {
     Lexical,
     Var,

@@ -393,6 +393,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         auto peephole = [&](Bytecode::InstructionStreamIterator& it, size_t old_size = 0) {
             Vector<u8> bytecode;
             bytecode.ensure_capacity(old_size);
+            HashMap<u32, Operand> const_prop;
+
             while (!it.at_end()) {
                 auto& instruction = const_cast<Instruction&>(*it);
 
@@ -421,6 +423,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue;
                     }
 
+                    // TODO: remove once block level override is added
+                    /*
                     if (auto next = it.peek(Instruction::Type::Mov); next.has_value()) {
                         auto& mov_next = static_cast<Bytecode::Op::Mov const&>(*next);
 
@@ -431,11 +435,32 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                             continue;
                         }
+                    }
+                    */
 
-                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
-                        continue;
+                    if (mov.src().is_constant()) {
+                        const_prop.set(mov.dst().raw(), mov.src());
+                    } else {
+                        const_prop.remove(mov.dst().raw());
                     }
                 }
+#define HANDLE_COMPARISON_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
+                else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
+                    auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
+                    auto lhs = const_prop.get(bin_op.lhs().raw()); \
+                    auto rhs = const_prop.get(bin_op.rhs().raw()); \
+                    if (lhs.has_value() || rhs.has_value()) { \
+                        Op::op_TitleCase new_op( \
+                            bin_op.dst(), lhs.value_or(bin_op.lhs()), rhs.value_or(bin_op.rhs()) \
+                        ); \
+                        bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
+                        ++it; \
+                        continue; \
+                    } \
+                }
+                JS_ENUMERATE_COMPARISON_OPS(HANDLE_COMPARISON_OP)
+                JS_ENUMERATE_BINARY_OPS(HANDLE_COMPARISON_OP)
+#undef HANDLE_COMPARISON_OP
                 else if (instruction.type() == Instruction::Type::Jump) {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
 
