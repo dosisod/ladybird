@@ -42,7 +42,6 @@ namespace JS::Bytecode::Op {
 #define JS_ENUMERATE_BINARY_OPS(X)                \
     X(Add, add, +)                                \
     X(Sub, sub, -)                                \
-    X(Sub, sub, -)                                \
     X(Mul, mul, *)                                \
     X(Div, div, /)                                \
     X(Mod, mod, %)                                \
