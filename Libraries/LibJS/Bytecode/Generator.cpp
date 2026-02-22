@@ -455,8 +455,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue;
                     }
                 }
-
-                if (instruction.type() == Instruction::Type::Jump) {
+                else if (instruction.type() == Instruction::Type::Jump) {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
 
                     // OPTIMIZATION: Don't emit jumps that just jump to the next block.
@@ -495,7 +494,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                 // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
                 //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
-                if (instruction.type() == Instruction::Type::JumpIf) {
+                else if (instruction.type() == Instruction::Type::JumpIf) {
                     auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
                     if (jump.true_target().basic_block_index() == block->index() + 1) {
                         Op::JumpFalse jump_false(jump.condition(), Label { jump.false_target() });
