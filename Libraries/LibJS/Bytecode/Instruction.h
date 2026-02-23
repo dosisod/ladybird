@@ -95,6 +95,8 @@ public:
     ByteString to_byte_string(Bytecode::Executable const&) const;
     void visit_labels(Function<void(Label&)> visitor);
     void visit_operands(Function<void(Operand&)> visitor);
+    void visit_input_operands(Function<void(Operand&)> visitor);
+    void visit_output_operands(Function<void(Operand&)> visitor);
 
     Strict strict() const { return m_strict; }
     void set_strict(Strict strict) { m_strict = strict; }
@@ -107,6 +109,9 @@ protected:
 
     void visit_labels_impl(Function<void(Label&)>) { }
     void visit_operands_impl(Function<void(Operand&)>) { }
+    void visit_input_operands_impl(Function<void(Operand&)>) { }
+    void visit_output_operands_impl(Function<void(Operand&)>) { }
+
 
 private:
     Type m_type {};

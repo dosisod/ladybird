@@ -12,6 +12,7 @@ class Field:
     name: str
     type: str
     is_array: bool = False
+    direction: str = "in"
 
 
 @dataclass
@@ -76,13 +77,14 @@ def parse_bytecode_def(path: str) -> List[OpDef]:
         if ":" not in stripped:
             raise RuntimeError(f"Malformed field line: {stripped!r}")
         lhs, rhs = stripped.split(":", 1)
-        field_name = lhs.strip()
+        field_parts = lhs.strip().split()
+        direction = " ".join(field_parts[:-1])
         field_type = rhs.strip()
         is_array = False
         if field_type.endswith("[]"):
             is_array = True
             field_type = field_type[:-2].strip()
-        current.fields.append(Field(name=field_name, type=field_type, is_array=is_array))
+        current.fields.append(Field(name=field_parts[-1], type=field_type, is_array=is_array, direction=direction))
 
     if in_op or current is not None:
         raise RuntimeError("Unclosed op block at end of file")

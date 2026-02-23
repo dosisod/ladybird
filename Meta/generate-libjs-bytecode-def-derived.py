@@ -83,16 +83,26 @@ def generate_enum_macro(ops: List[OpDef]) -> str:
     return "\n".join(lines)
 
 
-def generate_visit_operands(op: OpDef) -> Optional[str]:
-    has_any_operand = any(is_operand_type(f.type) for f in op.fields)
+def generate_visit_operands(op: OpDef, direction: Optional[str] = None) -> Optional[str]:
+    has_any_operand = any(is_operand_type(f.type) for f in op.fields if not direction or f.direction == direction)
     if not has_any_operand:
         return None
 
+    if direction == "in":
+        function_name = "visit_input_operands_impl"
+    elif direction == "out":
+        function_name = "visit_output_operands_impl"
+    else:
+        function_name = "visit_operands_impl"
+
     lines: List[str] = []
-    lines.append("    void visit_operands_impl(Function<void(Operand&)> visitor)")
+    lines.append(f"    void {function_name}(Function<void(Operand&)> visitor)")
     lines.append("    {")
 
     for f in op.fields:
+        if direction and f.direction != direction:
+            continue
+
         t = f.type.strip()
         if not is_operand_type(t):
             continue
@@ -300,6 +310,14 @@ def generate_class(op: OpDef) -> str:
     visit_operands = generate_visit_operands(op)
     if visit_operands:
         lines.append(visit_operands)
+
+    visit_input_operands = generate_visit_operands(op, "in")
+    if visit_input_operands:
+        lines.append(visit_input_operands)
+
+    visit_output_operands = generate_visit_operands(op, "out")
+    if visit_output_operands:
+        lines.append(visit_output_operands)
 
     visit_labels = generate_visit_labels(op)
     if visit_labels:
