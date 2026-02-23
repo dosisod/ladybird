@@ -722,12 +722,12 @@ endop
 
 op PostfixDecrement < Instruction
     out m_dst: Operand
-    m_src: Operand
+    in out m_src: Operand
 endop
 
 op PostfixIncrement < Instruction
     out m_dst: Operand
-    m_src: Operand
+    in out m_src: Operand
 endop
 
 op PutNormalById < Instruction
