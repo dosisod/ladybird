@@ -412,7 +412,7 @@ op In < Instruction
 endop
 
 op Increment < Instruction
-    out m_dst: Operand
+    in out m_dst: Operand
 endop
 
 op InitializeLexicalBinding < Instruction

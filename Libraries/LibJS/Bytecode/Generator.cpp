@@ -247,83 +247,6 @@ void Generator::emit_function_declaration_instantiation(SharedFunctionInstanceDa
     X(RightShift, right_shift, >>)                \
     X(UnsignedRightShift, unsigned_right_shift, >>>)
 
-#define JS_ENUMERATE_OTHER_OPS_WITH_DST(X)            \
-    X(Increment) \
-    X(Decrement) \
-    X(BitwiseNot) \
-    X(UnaryPlus) \
-    X(UnaryMinus) \
-    X(ToInt32) \
-    X(ToString) \
-    X(ArrayAppend) \
-    X(ToPrimitiveWithStringHint) \
-    X(Call) \
-    X(CallBuiltin) \
-    X(CallConstruct) \
-    X(CallConstructWithArgumentArray) \
-    X(CallDirectEval) \
-    X(CallDirectEvalWithArgumentArray) \
-    X(CallWithArgumentArray) \
-    X(Catch) \
-    X(ConcatString) \
-    X(CopyObjectExcludingProperties) \
-    X(CreateAsyncFromSyncIterator) \
-    X(CreateLexicalEnvironment) \
-    X(CreateRestParams) \
-    X(DeleteById) \
-    X(DeleteByValue) \
-    X(DeleteVariable) \
-    X(EnterObjectEnvironment) \
-    X(GetById) \
-    X(GetByIdWithThis) \
-    X(GetByValue) \
-    X(GetByValueWithThis) \
-    X(GetGlobal) \
-    X(GetImportMeta) \
-    X(GetLexicalEnvironment) \
-    X(GetLength) \
-    X(GetLengthWithThis) \
-    X(GetMethod) \
-    X(GetNewTarget) \
-    X(GetPrivateById) \
-    X(GetTemplateObject) \
-    X(GetBinding) \
-    X(GetInitializedBinding) \
-    X(HasPrivateId) \
-    X(ImportCall) \
-    X(In) \
-    X(Increment) \
-    X(InstanceOf) \
-    X(IsCallable) \
-    X(IsConstructor) \
-    X(NewArray) \
-    X(NewArrayWithLength) \
-    X(NewClass) \
-    X(NewFunction) \
-    X(NewObject) \
-    X(NewObjectWithNoPrototype) \
-    X(NewPrimitiveArray) \
-    X(NewRegExp) \
-    X(NewTypeError) \
-    X(NewReferenceError) \
-    X(Not) \
-    X(PostfixDecrement) \
-    X(PostfixIncrement) \
-    X(ResolveSuperBase) \
-    X(SuperCallWithArgumentArray) \
-    X(ToBoolean) \
-    X(ToLength) \
-    X(ToObject) \
-    X(Typeof) \
-    X(TypeofBinding) \
-    X(IteratorNext) \
-    X(IteratorToArray)
-
-/* custom dst
-InitializeLexicalBinding  ???
-InitializeVariableBinding ???
-*/
-
 GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind enclosing_function_kind, GC::Ptr<SharedFunctionInstanceData const> shared_function_instance_data, MustPropagateCompletion must_propagate_completion, BuiltinAbstractOperationsEnabled builtin_abstract_operations_enabled, Vector<LocalVariable> local_variable_names)
 {
     Generator generator(vm, shared_function_instance_data, must_propagate_completion, builtin_abstract_operations_enabled);
@@ -536,48 +459,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     }
                     */
                 }
-                else if (instruction.type() == Instruction::Type::CreateArguments) { \
-                    auto& op = static_cast<Bytecode::Op::CreateArguments&>(instruction); \
-                    if (op.dst().has_value()) \
-                        const_prop.remove(op.dst()->raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::GetCalleeAndThisFromEnvironment) { \
-                    auto& op = static_cast<Bytecode::Op::GetCalleeAndThisFromEnvironment&>(instruction); \
-                    const_prop.remove(op.callee().raw()); \
-                    const_prop.remove(op.this_value().raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::GetCompletionFields) { \
-                    auto& op = static_cast<Bytecode::Op::GetCompletionFields&>(instruction); \
-                    const_prop.remove(op.type_dst().raw()); \
-                    const_prop.remove(op.value_dst().raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::GetIterator) { \
-                    auto& op = static_cast<Bytecode::Op::GetIterator&>(instruction); \
-                    const_prop.remove(op.dst_iterator_object().raw()); \
-                    const_prop.remove(op.dst_iterator_next().raw()); \
-                    const_prop.remove(op.dst_iterator_done().raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::IteratorNextUnpack) { \
-                    auto& op = static_cast<Bytecode::Op::IteratorNextUnpack&>(instruction); \
-                    const_prop.remove(op.dst_value().raw()); \
-                    const_prop.remove(op.dst_done().raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::GetObjectPropertyIterator) { \
-                    auto& op = static_cast<Bytecode::Op::GetObjectPropertyIterator&>(instruction); \
-                    const_prop.remove(op.dst_iterator_object().raw()); \
-                    const_prop.remove(op.dst_iterator_next().raw()); \
-                    const_prop.remove(op.dst_iterator_done().raw()); \
-                }
-                else if (instruction.type() == Instruction::Type::InitObjectLiteralProperty) { \
-                    auto& op = static_cast<Bytecode::Op::InitObjectLiteralProperty&>(instruction); \
-                    const_prop.remove(op.object().raw()); \
-                }
-#define HANDLE_OP_WITH_DST(op_TitleCase) \
-                else if (instruction.type() == Instruction::Type::op_TitleCase) { \
-                    auto& op = static_cast<Bytecode::Op::op_TitleCase&>(instruction); \
-                    const_prop.remove(op.dst().raw()); \
-                }
-                JS_ENUMERATE_OTHER_OPS_WITH_DST(HANDLE_OP_WITH_DST)
 #define HANDLE_CONST_PROP_BINARY_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
                 else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
@@ -596,7 +477,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 }
                 JS_ENUMERATE_BINARY_OPS2(HANDLE_CONST_PROP_BINARY_OP)
                 JS_ENUMERATE_COMPARISON_OPS(HANDLE_CONST_PROP_BINARY_OP)
-#undef HANDLE_OP_WITH_DST
 #undef HANDLE_CONST_PROP_BINARY_OP
                 else if (instruction.type() == Instruction::Type::Jump) {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
@@ -651,6 +531,11 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         ++it;
                         continue;
                     }
+                }
+                else {
+                    instruction.visit_output_operands([&](Operand& op) {
+                        const_prop.remove(op.raw());
+                    });
                 }
 
                 bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());

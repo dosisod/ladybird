@@ -84,7 +84,7 @@ def generate_enum_macro(ops: List[OpDef]) -> str:
 
 
 def generate_visit_operands(op: OpDef, direction: Optional[str] = None) -> Optional[str]:
-    has_any_operand = any(is_operand_type(f.type) for f in op.fields if not direction or f.direction == direction)
+    has_any_operand = any(is_operand_type(f.type) for f in op.fields if not direction or direction in f.direction)
     if not has_any_operand:
         return None
 
@@ -100,7 +100,7 @@ def generate_visit_operands(op: OpDef, direction: Optional[str] = None) -> Optio
     lines.append("    {")
 
     for f in op.fields:
-        if direction and f.direction != direction:
+        if direction and direction not in f.direction:
             continue
 
         t = f.type.strip()
