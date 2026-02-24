@@ -354,17 +354,12 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         while (!it.at_end()) {
             auto& instruction = const_cast<Instruction&>(*it);
 
-            if (instruction.type() == Instruction::Type::Mov) {
-                auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
-                seen_operands.set(mov.src().raw());
-                dead_operands.set(mov.src().raw());
-                dead_operands.set(mov.dst().raw());
-            } else {
-                instruction.visit_operands([&](Operand& op) {
-                    seen_operands.set(op.raw());
-                    dead_operands.set(op.raw());
-                });
-            }
+            instruction.visit_input_operands([&](Operand& op) {
+                seen_operands.set(op.raw());
+            });
+            instruction.visit_output_operands([&](Operand& op) {
+                dead_operands.set(op.raw());
+            });
 
             ++it;
         }

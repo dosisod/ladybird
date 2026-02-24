@@ -100,6 +100,8 @@ def generate_visit_operands(op: OpDef, direction: Optional[str] = None) -> Optio
     lines.append("    {")
 
     for f in op.fields:
+        f.direction = f.direction or "in"
+
         if direction and direction not in f.direction:
             continue
 
