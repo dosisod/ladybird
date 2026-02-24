@@ -135,7 +135,7 @@ op Catch < Instruction
 endop
 
 op ConcatString < Instruction
-    out m_dst: Operand
+    in out m_dst: Operand
     m_src: Operand
 endop
 

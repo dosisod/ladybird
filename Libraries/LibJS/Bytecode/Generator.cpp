@@ -444,6 +444,46 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue;
                     }
 
+                    // load next instruction
+                    // get input ops
+                    // get output ops
+                    // if mov dst is used as input op, keep mov
+                    // if output op will be clobbered, remove mov
+
+                    ++it;
+                    if (it.at_end()) {
+                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                        break;
+                    }
+
+                    auto& next_instruction = const_cast<Instruction&>(*it);
+
+                    auto is_move_dest_used_in_next_instruction = false;
+
+                    next_instruction.visit_input_operands([&](Operand& op) {
+                        if (op.raw() == mov.dst().raw())
+                            is_move_dest_used_in_next_instruction = true;
+                    });
+
+                    if (is_move_dest_used_in_next_instruction) {
+                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                        continue;
+                    }
+
+                    auto is_move_dest_overriden_by_next_instruction = false;
+                    next_instruction.visit_output_operands([&](Operand& op) {
+                        if (op.raw() == mov.dst().raw())
+                            is_move_dest_overriden_by_next_instruction = true;
+                    });
+
+                    if (is_move_dest_overriden_by_next_instruction) {
+                        // OPTIMIZATION: Skip emit of dead store as next instruction overrides this one
+                        continue;
+                    }
+
+                    bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                    continue;
+
                     // TODO: remove once block level override is added
                     /*
                     if (auto next = it.peek(Instruction::Type::Mov); next.has_value()) {
