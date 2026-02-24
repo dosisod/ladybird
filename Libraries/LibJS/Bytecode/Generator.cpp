@@ -349,7 +349,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
     if (undefined_constant.has_value())
         undefined_constant.value().operand().offset_index_by(number_of_registers + number_of_locals);
 
-    for (auto& block : generator.m_root_basic_blocks) {
+    for (size_t at_block = 0; at_block < generator.m_root_basic_blocks.size(); at_block++) {
+        auto& block = generator.m_root_basic_blocks[at_block];
+
         basic_block_start_offsets.append(bytecode.size());
         if (block->handler()) {
             unlinked_exception_handlers.append({
@@ -432,7 +434,13 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                     ++it;
                     if (it.at_end()) {
-                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                        auto is_final_block = at_block >= generator.m_root_basic_blocks.size() - 1;
+
+                        // OPTIMIZATION: skip dead move if we are on the last block, otherwise we have to keep it
+                        if (!is_final_block) {
+                            bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                        }
+
                         break;
                     }
 
