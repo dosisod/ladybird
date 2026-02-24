@@ -444,12 +444,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue;
                     }
 
-                    // load next instruction
-                    // get input ops
-                    // get output ops
-                    // if mov dst is used as input op, keep mov
-                    // if output op will be clobbered, remove mov
-
                     ++it;
                     if (it.at_end()) {
                         bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
@@ -483,21 +477,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                     bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
                     continue;
-
-                    // TODO: remove once block level override is added
-                    /*
-                    if (auto next = it.peek(Instruction::Type::Mov); next.has_value()) {
-                        auto& mov_next = static_cast<Bytecode::Op::Mov const&>(*next);
-
-                        // OPTIMIZATION: move destination will immediately be overriden, skip emit
-                        if (mov.dst() == mov_next.dst()) {
-                            bytecode.append(reinterpret_cast<u8 const*>(next.ptr()), next->length());
-                            ++it;
-
-                            continue;
-                        }
-                    }
-                    */
                 }
 #define HANDLE_CONST_PROP_BINARY_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
                 else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
