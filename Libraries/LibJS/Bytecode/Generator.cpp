@@ -243,7 +243,7 @@ void Generator::emit_function_declaration_instantiation(SharedFunctionInstanceDa
     X(BitwiseAnd, bitwise_and, &)                 \
     X(BitwiseOr, bitwise_or, |)                   \
     X(BitwiseXor, bitwise_xor, ^)                 \
-    X(LeftShift, left_shuft, <<)                  \
+    X(LeftShift, left_shift, <<)                  \
     X(RightShift, right_shift, >>)                \
     X(UnsignedRightShift, unsigned_right_shift, >>>)
 
@@ -447,6 +447,17 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
                     auto lhs = const_prop.get(bin_op.lhs().raw()); \
                     auto rhs = const_prop.get(bin_op.rhs().raw()); \
+                    if (lhs.has_value() && rhs.has_value()) { \
+                        auto c = generator.add_constant( \
+                            MUST(op_snake_case(generator.vm(), generator.get_constant(*lhs), generator.get_constant(*rhs))) \
+                        ); \
+                        number_of_constants = generator.m_constants.size(); \
+                        Op::Mov mov(bin_op.dst(), c); \
+                        bytecode.append(reinterpret_cast<u8 const*>(&mov), mov.length()); \
+                        ++it; \
+                        const_prop.set(bin_op.dst().raw(), c.operand()); \
+                        continue; \
+                    } \
                     if (lhs.has_value() || rhs.has_value()) { \
                         Op::op_TitleCase new_op( \
                             bin_op.dst(), lhs.value_or(bin_op.lhs()), rhs.value_or(bin_op.rhs()) \
@@ -459,7 +470,24 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     const_prop.remove(bin_op.dst().raw()); \
                 }
                 JS_ENUMERATE_BINARY_OPS2(HANDLE_CONST_PROP_BINARY_OP)
-                JS_ENUMERATE_COMPARISON_OPS(HANDLE_CONST_PROP_BINARY_OP)
+                // TODO: support const eval of comparison ops
+#define HANDLE_CONST_PROP_COMPARISON_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
+                else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
+                    auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
+                    auto lhs = const_prop.get(bin_op.lhs().raw()); \
+                    auto rhs = const_prop.get(bin_op.rhs().raw()); \
+                    if (lhs.has_value() || rhs.has_value()) { \
+                        Op::op_TitleCase new_op( \
+                            bin_op.dst(), lhs.value_or(bin_op.lhs()), rhs.value_or(bin_op.rhs()) \
+                        ); \
+                        bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
+                        ++it; \
+                        const_prop.remove(bin_op.dst().raw()); \
+                        continue; \
+                    } \
+                    const_prop.remove(bin_op.dst().raw()); \
+                }
+                JS_ENUMERATE_COMPARISON_OPS(HANDLE_CONST_PROP_COMPARISON_OP)
 #undef HANDLE_CONST_PROP_BINARY_OP
                 else if (instruction.type() == Instruction::Type::Jump) {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
