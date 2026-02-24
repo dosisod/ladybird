@@ -381,18 +381,35 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
         auto peephole = [&](Bytecode::InstructionStreamIterator& it, size_t old_size, bool& should_break) {
             Vector<u8> bytecode;
             bytecode.ensure_capacity(old_size);
-            HashMap<u32, Operand> const_prop;
+            HashMap<u32, Operand> const_prop_moves;
+            HashMap<u32, size_t> dead_move_locations;
 
             while (!it.at_end()) {
                 auto& instruction = const_cast<Instruction&>(*it);
 
                 if (instruction.type() == Instruction::Type::Mov) {
                     auto& mov = static_cast<Bytecode::Op::Mov const&>(instruction);
+                    auto mov_dst = mov.dst().raw();
 
                     if (mov.src().is_constant()) {
-                        const_prop.set(mov.dst().raw(), mov.src());
+                        const_prop_moves.set(mov_dst, mov.src());
                     } else {
-                        const_prop.remove(mov.dst().raw());
+                        const_prop_moves.remove(mov_dst);
+                    }
+
+                    dead_move_locations.remove(mov.src().raw());
+
+                    if (auto dead_location = dead_move_locations.get(mov_dst); dead_location.has_value()) {
+                        bytecode.remove(*dead_location, instruction.length());
+
+                        for (auto [op, offset]: dead_move_locations) {
+                            // Update bytecode offsets of MOV instructions that are ahead of current position
+                            if (offset > *dead_location) {
+                                dead_move_locations.set(op, offset - instruction.length());
+                            }
+                        }
+                        dead_move_locations.remove(mov_dst);
+                        continue;
                     }
 
                     if (auto next = it.peek(Instruction::Type::Return); next.has_value()) {
@@ -411,6 +428,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue;
                     }
 
+                    dead_move_locations.remove(mov_dst);
+
                     ++it;
                     if (it.at_end()) {
                         bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
@@ -421,7 +440,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     auto& next_instruction = const_cast<Instruction&>(*it);
 
                     next_instruction.visit_input_operands([&](Operand& op) {
-                        if (op.raw() == mov.dst().raw())
+                        if (op.raw() == mov_dst)
                             is_move_dest_used_in_next_instruction = true;
                     });
 
@@ -429,7 +448,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         bool is_move_dest_overriden_by_next_instruction = false;
 
                         next_instruction.visit_output_operands([&](Operand& op) {
-                            if (op.raw() == mov.dst().raw())
+                            if (op.raw() == mov_dst)
                                 is_move_dest_overriden_by_next_instruction = true;
                         });
 
@@ -439,14 +458,22 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         }
                     }
 
+                    dead_move_locations.set(mov_dst, bytecode.size());
                     bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+
                     continue;
                 }
+
+                instruction.visit_input_operands([&](Operand& op) {
+                    dead_move_locations.remove(op.raw());
+                });
+
+                if (false) {}
 #define HANDLE_CONST_PROP_BINARY_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
                 else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
-                    auto lhs = const_prop.get(bin_op.lhs().raw()); \
-                    auto rhs = const_prop.get(bin_op.rhs().raw()); \
+                    auto lhs = const_prop_moves.get(bin_op.lhs().raw()); \
+                    auto rhs = const_prop_moves.get(bin_op.rhs().raw()); \
                     if (lhs.has_value() && rhs.has_value()) { \
                         auto c = generator.add_constant( \
                             MUST(op_snake_case(generator.vm(), generator.get_constant(*lhs), generator.get_constant(*rhs))) \
@@ -455,7 +482,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         Op::Mov mov(bin_op.dst(), c); \
                         bytecode.append(reinterpret_cast<u8 const*>(&mov), mov.length()); \
                         ++it; \
-                        const_prop.set(bin_op.dst().raw(), c.operand()); \
+                        const_prop_moves.set(bin_op.dst().raw(), c.operand()); \
                         continue; \
                     } \
                     if (lhs.has_value() || rhs.has_value()) { \
@@ -464,28 +491,28 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         ); \
                         bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
                         ++it; \
-                        const_prop.remove(bin_op.dst().raw()); \
+                        const_prop_moves.remove(bin_op.dst().raw()); \
                         continue; \
                     } \
-                    const_prop.remove(bin_op.dst().raw()); \
+                    const_prop_moves.remove(bin_op.dst().raw()); \
                 }
                 JS_ENUMERATE_BINARY_OPS2(HANDLE_CONST_PROP_BINARY_OP)
                 // TODO: support const eval of comparison ops
 #define HANDLE_CONST_PROP_COMPARISON_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
                 else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
-                    auto lhs = const_prop.get(bin_op.lhs().raw()); \
-                    auto rhs = const_prop.get(bin_op.rhs().raw()); \
+                    auto lhs = const_prop_moves.get(bin_op.lhs().raw()); \
+                    auto rhs = const_prop_moves.get(bin_op.rhs().raw()); \
                     if (lhs.has_value() || rhs.has_value()) { \
                         Op::op_TitleCase new_op( \
                             bin_op.dst(), lhs.value_or(bin_op.lhs()), rhs.value_or(bin_op.rhs()) \
                         ); \
                         bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
                         ++it; \
-                        const_prop.remove(bin_op.dst().raw()); \
+                        const_prop_moves.remove(bin_op.dst().raw()); \
                         continue; \
                     } \
-                    const_prop.remove(bin_op.dst().raw()); \
+                    const_prop_moves.remove(bin_op.dst().raw()); \
                 }
                 JS_ENUMERATE_COMPARISON_OPS(HANDLE_CONST_PROP_COMPARISON_OP)
 #undef HANDLE_CONST_PROP_BINARY_OP
@@ -530,7 +557,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
                 else if (instruction.type() == Instruction::Type::JumpIf) {
                     auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
-                    auto cond = const_prop.get(jump.condition().raw()).value_or(jump.condition());
+                    auto cond = const_prop_moves.get(jump.condition().raw()).value_or(jump.condition());
                     if (jump.true_target().basic_block_index() == block->index() + 1) {
                         Op::JumpFalse jump_false(cond, Label { jump.false_target() });
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
@@ -546,7 +573,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 }
                 else {
                     instruction.visit_output_operands([&](Operand& op) {
-                        const_prop.remove(op.raw());
+                        const_prop_moves.remove(op.raw());
                     });
                 }
 
@@ -555,7 +582,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
             }
 
             // OPTIMIZATION: only run peephole optimizer once for small blocks
-            if (it.offset() <= 24) should_break = true;
+            if (it.offset() <= 32) should_break = true;
 
             return bytecode;
         };
