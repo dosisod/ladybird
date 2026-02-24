@@ -342,30 +342,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
     auto number_of_registers = generator.m_next_register;
     auto number_of_constants = generator.m_constants.size();
     auto number_of_locals = local_variable_names.size();
-    HashTable<u32> dead_operands;
-    HashTable<u32> seen_operands;
 
     u32 max_argument_index = 0;
-
-    // Find operands which are written, but never read
-    // TODO: move to peephole pass
-    for (auto& block : generator.m_root_basic_blocks) {
-        Bytecode::InstructionStreamIterator it(block->instruction_stream());
-        while (!it.at_end()) {
-            auto& instruction = const_cast<Instruction&>(*it);
-
-            instruction.visit_input_operands([&](Operand& op) {
-                seen_operands.set(op.raw());
-            });
-            instruction.visit_output_operands([&](Operand& op) {
-                dead_operands.set(op.raw());
-            });
-
-            ++it;
-        }
-    }
-
-    dead_operands.remove(seen_operands);
 
     // Also rewrite the `undefined` constant if we have one for inserting End.
     if (undefined_constant.has_value())
@@ -415,11 +393,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         const_prop.set(mov.dst().raw(), mov.src());
                     } else {
                         const_prop.remove(mov.dst().raw());
-                    }
-
-                    if (dead_operands.contains(mov.dst().raw())) {
-                        ++it;
-                        continue;
                     }
 
                     if (auto next = it.peek(Instruction::Type::Return); next.has_value()) {
