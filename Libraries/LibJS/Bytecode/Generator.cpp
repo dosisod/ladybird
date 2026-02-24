@@ -378,7 +378,7 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
             source_map.append({ static_cast<u32>(bytecode.size()), record });
         };
 
-        auto peephole = [&](Bytecode::InstructionStreamIterator& it, size_t old_size = 0) {
+        auto peephole = [&](Bytecode::InstructionStreamIterator& it, size_t old_size, bool& should_break) {
             Vector<u8> bytecode;
             bytecode.ensure_capacity(old_size);
             HashMap<u32, Operand> const_prop;
@@ -399,7 +399,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         auto& ret = static_cast<Bytecode::Op::Return const&>(*next);
 
                         // OPTIMIZATION: Moved value is not returned, so move is redundant
-                        // TODO: replace with proper dead store pass
                         if (mov.dst() != ret.value())
                             continue;
 
@@ -418,29 +417,26 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         break;
                     }
 
+                    bool is_move_dest_used_in_next_instruction = false;
                     auto& next_instruction = const_cast<Instruction&>(*it);
-
-                    auto is_move_dest_used_in_next_instruction = false;
 
                     next_instruction.visit_input_operands([&](Operand& op) {
                         if (op.raw() == mov.dst().raw())
                             is_move_dest_used_in_next_instruction = true;
                     });
 
-                    if (is_move_dest_used_in_next_instruction) {
-                        bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
-                        continue;
-                    }
+                    if (!is_move_dest_used_in_next_instruction) {
+                        bool is_move_dest_overriden_by_next_instruction = false;
 
-                    auto is_move_dest_overriden_by_next_instruction = false;
-                    next_instruction.visit_output_operands([&](Operand& op) {
-                        if (op.raw() == mov.dst().raw())
-                            is_move_dest_overriden_by_next_instruction = true;
-                    });
+                        next_instruction.visit_output_operands([&](Operand& op) {
+                            if (op.raw() == mov.dst().raw())
+                                is_move_dest_overriden_by_next_instruction = true;
+                        });
 
-                    if (is_move_dest_overriden_by_next_instruction) {
-                        // OPTIMIZATION: Skip emit of dead store as next instruction overrides this one
-                        continue;
+                        if (is_move_dest_overriden_by_next_instruction) {
+                            // OPTIMIZATION: Current move is overridden by next op, skip emit
+                            continue;
+                        }
                     }
 
                     bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
@@ -506,14 +502,15 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
                 else if (instruction.type() == Instruction::Type::JumpIf) {
                     auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
+                    auto cond = const_prop.get(jump.condition().raw()).value_or(jump.condition());
                     if (jump.true_target().basic_block_index() == block->index() + 1) {
-                        Op::JumpFalse jump_false(jump.condition(), Label { jump.false_target() });
+                        Op::JumpFalse jump_false(cond, Label { jump.false_target() });
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
                         ++it;
                         continue;
                     }
                     if (jump.false_target().basic_block_index() == block->index() + 1) {
-                        Op::JumpTrue jump_true(jump.condition(), Label { jump.true_target() });
+                        Op::JumpTrue jump_true(cond, Label { jump.true_target() });
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_true), jump_true.length());
                         ++it;
                         continue;
@@ -529,6 +526,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 ++it;
             }
 
+            // OPTIMIZATION: only run peephole optimizer once for small blocks
+            if (it.offset() <= 24) should_break = true;
+
             return bytecode;
         };
 
@@ -536,7 +536,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
         for (size_t i = 0; i < 3; i++) {
             Bytecode::InstructionStreamIterator it(block_bytecode);
-            block_bytecode = peephole(it, block_bytecode.size());
+            bool should_break = false;
+            block_bytecode = peephole(it, block_bytecode.size(), should_break);
+            if (should_break) break;
         }
 
         bytecode.grow_capacity(block_bytecode.size());
