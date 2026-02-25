@@ -385,7 +385,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
             bytecode.ensure_capacity(old_size);
             HashMap<u32, Operand> const_prop_moves;
             HashMap<u32, size_t> dead_move_locations;
-            bool was_optimization_applied = false;
 
             while (!it.at_end()) {
                 auto& instruction = const_cast<Instruction&>(*it);
@@ -412,12 +411,10 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                             }
                         }
                         dead_move_locations.remove(mov_dst);
-                        was_optimization_applied = true;
                         continue;
                     }
 
                     if (auto next = it.peek(Instruction::Type::Return); next.has_value()) {
-                        was_optimization_applied = true;
                         auto& ret = static_cast<Bytecode::Op::Return const&>(*next);
 
                         // OPTIMIZATION: Moved value is not returned, so move is redundant
@@ -441,7 +438,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                         // OPTIMIZATION: skip dead move if we are on the last block, otherwise we have to keep it
                         if (!is_final_block) {
-                            was_optimization_applied = true;
                             bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
                         }
 
@@ -466,7 +462,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
 
                         if (is_move_dest_overriden_by_next_instruction) {
                             // OPTIMIZATION: Current move is overridden by next op, skip emit
-                            was_optimization_applied = true;
                             continue;
                         }
                     }
@@ -496,7 +491,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         bytecode.append(reinterpret_cast<u8 const*>(&mov), mov.length()); \
                         ++it; \
                         const_prop_moves.set(bin_op.dst().raw(), c.operand()); \
-                        was_optimization_applied = true; \
                         continue; \
                     } \
                     if (lhs.has_value() || rhs.has_value()) { \
@@ -506,7 +500,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
                         ++it; \
                         const_prop_moves.remove(bin_op.dst().raw()); \
-                        was_optimization_applied = true; \
                         continue; \
                     } \
                     const_prop_moves.remove(bin_op.dst().raw()); \
@@ -525,7 +518,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         bytecode.append(reinterpret_cast<u8 const*>(&new_op), new_op.length()); \
                         ++it; \
                         const_prop_moves.remove(bin_op.dst().raw()); \
-                        was_optimization_applied = true; \
                         continue; \
                     } \
                     const_prop_moves.remove(bin_op.dst().raw()); \
@@ -542,7 +534,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                             basic_block_start_offsets.take_last();
                         }
                         ++it;
-                        was_optimization_applied = true;
                         continue;
                     }
 
@@ -557,7 +548,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                             Op::Return return_op(return_instruction.value());
                             bytecode.append(reinterpret_cast<u8 const*>(&return_op), return_op.length());
                             ++it;
-                            was_optimization_applied = true;
                             continue;
                         }
 
@@ -566,7 +556,6 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                             Op::End end_op(return_instruction.value());
                             bytecode.append(reinterpret_cast<u8 const*>(&end_op), end_op.length());
                             ++it;
-                            was_optimization_applied = true;
                             continue;
                         }
                     }
@@ -581,14 +570,12 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         Op::JumpFalse jump_false(cond, Label { jump.false_target() });
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_false), jump_false.length());
                         ++it;
-                        was_optimization_applied = true;
                         continue;
                     }
                     if (jump.false_target().basic_block_index() == block->index() + 1) {
                         Op::JumpTrue jump_true(cond, Label { jump.true_target() });
                         bytecode.append(reinterpret_cast<u8 const*>(&jump_true), jump_true.length());
                         ++it;
-                        was_optimization_applied = true;
                         continue;
                     }
                 }
@@ -602,8 +589,8 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                 ++it;
             }
 
-            // OPTIMIZATION: don't continue running peephole optimizations if block is too small or wasn't optimized
-            if (!was_optimization_applied || it.offset() <= 32) should_break = true;
+            // OPTIMIZATION: don't optimize block again if block is too small
+            if (it.offset() <= 32) should_break = true;
 
             return bytecode;
         };
