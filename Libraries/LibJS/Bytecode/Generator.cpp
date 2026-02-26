@@ -476,9 +476,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                     dead_move_locations.remove(op.raw());
                 });
 
-                if (false) {}
+                switch (instruction.type()) {
 #define HANDLE_CONST_PROP_BINARY_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
-                else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
+                case Instruction::Type::op_TitleCase: {\
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
                     auto lhs = const_prop_moves.get(bin_op.lhs().raw()); \
                     auto rhs = const_prop_moves.get(bin_op.rhs().raw()); \
@@ -503,11 +503,12 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue; \
                     } \
                     const_prop_moves.remove(bin_op.dst().raw()); \
+                    break; \
                 }
                 JS_ENUMERATE_BINARY_OPS2(HANDLE_CONST_PROP_BINARY_OP)
                 // TODO: support const eval of comparison ops
 #define HANDLE_CONST_PROP_COMPARISON_OP(op_TitleCase, op_snake_case, numeric_operator)                               \
-                else if (instruction.type() == Instruction::Type::op_TitleCase) {                             \
+                case Instruction::Type::op_TitleCase: {                             \
                     auto& bin_op = static_cast<Bytecode::Op::op_TitleCase&>(instruction);   \
                     auto lhs = const_prop_moves.get(bin_op.lhs().raw()); \
                     auto rhs = const_prop_moves.get(bin_op.rhs().raw()); \
@@ -521,10 +522,11 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         continue; \
                     } \
                     const_prop_moves.remove(bin_op.dst().raw()); \
+                    break; \
                 }
                 JS_ENUMERATE_COMPARISON_OPS(HANDLE_CONST_PROP_COMPARISON_OP)
 #undef HANDLE_CONST_PROP_BINARY_OP
-                else if (instruction.type() == Instruction::Type::Jump) {
+                case Instruction::Type::Jump: {
                     auto& jump = static_cast<Bytecode::Op::Jump&>(instruction);
 
                     // OPTIMIZATION: Don't emit jumps that just jump to the next block.
@@ -559,8 +561,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                             continue;
                         }
                     }
+                    break;
                 }
-                else if (instruction.type() == Instruction::Type::BitwiseNot) {
+                case Instruction::Type::BitwiseNot:
                     if (auto next = it.peek(Instruction::Type::BitwiseNot); next.has_value()) {
                         auto& first = static_cast<Bytecode::Op::BitwiseNot const&>(instruction);
                         auto& second = static_cast<Bytecode::Op::BitwiseNot const&>(*next);
@@ -575,11 +578,11 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         }
                         continue;
                     }
-                }
+                    break;
 
-                // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
-                //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
-                else if (instruction.type() == Instruction::Type::JumpIf) {
+                case Instruction::Type::JumpIf: {
+                    // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
+                    //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
                     auto& jump = static_cast<Bytecode::Op::JumpIf&>(instruction);
                     auto cond = const_prop_moves.get(jump.condition().raw()).value_or(jump.condition());
                     if (jump.true_target().basic_block_index() == block->index() + 1) {
@@ -594,8 +597,9 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         ++it;
                         continue;
                     }
+                    break;
                 }
-                else {
+                default:
                     instruction.visit_output_operands([&](Operand& op) {
                         const_prop_moves.remove(op.raw());
                     });
