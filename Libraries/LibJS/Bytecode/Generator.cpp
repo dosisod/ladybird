@@ -560,6 +560,22 @@ GC::Ref<Executable> Generator::compile(VM& vm, ASTNode const& node, FunctionKind
                         }
                     }
                 }
+                else if (instruction.type() == Instruction::Type::BitwiseNot) {
+                    if (auto next = it.peek(Instruction::Type::BitwiseNot); next.has_value()) {
+                        auto& first = static_cast<Bytecode::Op::BitwiseNot const&>(instruction);
+                        auto& second = static_cast<Bytecode::Op::BitwiseNot const&>(*next);
+
+                        if (first.dst() == second.src()) {
+                            // OPTIMIZATION: ~~x === ToInt32(x)
+                            Op::ToInt32 to_int32(second.dst(), first.src());
+                            bytecode.append(reinterpret_cast<u8 const*>(&to_int32), to_int32.length());
+                            ++it;
+                        } else {
+                            bytecode.append(reinterpret_cast<u8 const*>(&instruction), instruction.length());
+                        }
+                        continue;
+                    }
+                }
 
                 // OPTIMIZATION: For `JumpIf` where one of the targets is the very next block,
                 //               we can emit a `JumpTrue` or `JumpFalse` (to the other block) instead.
